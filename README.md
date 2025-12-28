@@ -1,0 +1,528 @@
+# MiniTools - 统一工具管理平台
+
+一个插件化的工具管理系统，提供HTTP API接口和Web界面，支持远程访问和扩展。
+
+## 特性
+
+- 🔌 **插件化架构**: 易于添加新工具，只需继承BasePlugin类
+- 🌐 **HTTP API**: 提供RESTful API接口，支持远程调用
+- 🖥️ **Web界面**: 为每个插件提供友好的Web操作界面
+- 🔄 **热重载**: 支持动态重新加载插件，无需重启服务
+- 📝 **参数验证**: 自动验证插件参数
+- 🛡️ **跨域支持**: 支持CORS，便于前端集成
+- 📦 **文件处理**: 支持大文件上传（最大2GB）
+
+## 项目结构
+
+```
+miniTools/
+├── backend/              # 后台模块
+│   ├── __init__.py
+│   ├── base_plugin.py    # 插件基类
+│   └── plugin_manager.py # 插件管理器
+├── frontend/             # 前台模块
+│   ├── __init__.py
+│   └── api_server.py     # HTTP API服务
+├── plugins/              # 插件目录
+│   ├── __init__.py
+│   ├── calculator.py     # 计算器工具
+│   ├── text_tool.py      # 文本处理工具
+│   ├── system_info.py    # 系统信息工具
+│   ├── token_generator.py# 令牌生成器
+│   ├── json_formatter.py # JSON格式化工具
+│   └── video_compressor.py# 视频压缩工具
+├── static/               # 静态文件（Web界面）
+│   ├── index.html        # 主页
+│   ├── calculator.html
+│   ├── text_tool.html
+│   ├── system_info.html
+│   ├── token_generator.html
+│   ├── json_formatter.html
+│   └── video_compressor.html
+├── uploads/              # 上传文件目录
+├── outputs/              # 输出文件目录
+├── config.py             # 配置文件
+├── main.py               # 主程序入口
+├── requirements.txt      # 依赖列表
+└── README.md            # 说明文档
+```
+
+## 已实现的插件
+
+### 1. 计算器 (Calculator)
+- 基本算术运算：加、减、乘、除
+- Web界面：实时计算显示
+
+### 2. 文本处理工具 (TextTool)
+- 大小写转换（大写、小写、首字母大写）
+- 文本统计（字符数、单词数、行数）
+- 文本反转
+- Web界面：多功能文本操作
+
+### 3. 系统信息 (SystemInfo)
+- CPU信息：核心数、使用率、频率
+- 内存信息：总量、已用、可用
+- 磁盘信息：总空间、已用空间
+- 网络信息：网络接口统计
+- Web界面：实时系统监控
+
+### 4. 令牌生成器 (TokenGenerator)
+- UUID生成（v1, v4）
+- 随机令牌生成（指定长度）
+- 时间戳令牌
+- JWT风格令牌（Base64编码）
+- Web界面：多种令牌快速生成
+
+### 5. JSON格式化工具 (JsonFormatter)
+- JSON格式化（美化）
+- JSON压缩（移除空格）
+- JSON验证
+- 语法高亮显示
+- Web界面：实时格式化和验证
+
+### 6. 视频压缩工具 (VideoCompressor) ⭐
+- **GPU加速**: 支持NVIDIA NVENC、AMD VCE、Intel QSV
+- **显卡信息**: 自动检测并显示显卡型号和显存容量
+- **多种质量选择**: 7级质量（极低、低、中低、标准、中高、高、超高）
+- **分辨率调整**: 支持原始、1080p、720p、480p、360p
+- **编码速度**: 快速、中等、慢速（更高质量）
+- **智能预估**: 实时预估压缩后文件大小、处理时间和压缩比
+- **大文件支持**: 支持最大2GB视频文件上传
+- **进度显示**: 实时显示上传和处理进度
+- Web界面：完整的视频压缩流程
+
+## 安装
+
+### 前置依赖
+
+1. **Python 3.7+**
+2. **FFmpeg** (视频压缩功能必需)
+   - Windows: 从 [FFmpeg官网](https://ffmpeg.org/download.html) 下载并添加到PATH
+   - Linux: `sudo apt install ffmpeg`
+   - macOS: `brew install ffmpeg`
+3. **nvidia-smi** (可选，用于NVIDIA显卡信息显示)
+   - 随NVIDIA显卡驱动自动安装
+
+### 安装步骤
+
+1. 克隆或下载本项目
+
+2. 安装Python依赖：
+```bash
+pip install -r requirements.txt
+```
+
+3. 创建必要的目录：
+```bash
+mkdir uploads outputs
+```
+
+## 使用
+
+### 启动服务
+
+```bash
+python main.py
+```
+
+服务将在 `http://0.0.0.0:18787` 启动
+
+### 访问Web界面
+
+在浏览器中打开：`http://localhost:18787`
+
+您将看到主页，列出所有可用的工具插件。点击任何工具即可使用其Web界面。
+
+### API接口
+
+#### 1. 获取API信息
+```
+GET /
+返回主页HTML
+```
+
+#### 2. 获取所有插件列表
+```
+GET /plugins
+```
+
+响应示例：
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "name": "TextTool",
+      "version": "1.0.0",
+      "description": "提供文本处理功能",
+      "parameters": [...]
+    }
+  ],
+  "count": 6
+}
+```
+
+#### 3. 获取指定插件信息
+```
+GET /plugins/<plugin_name>
+```
+
+#### 4. 执行插件
+```
+POST /plugins/<plugin_name>/execute
+Content-Type: application/json
+
+{
+  "param1": "value1",
+  "param2": "value2"
+}
+```
+
+#### 5. 重新加载插件
+```
+POST /plugins/reload
+```
+
+#### 6. 文件上传 (用于视频压缩)
+```
+POST /upload
+Content-Type: multipart/form-data
+
+file: <视频文件>
+```
+
+#### 7. 视频压缩
+```
+POST /video/compress
+Content-Type: application/json
+
+{
+  "input_file": "uploads/video.mp4",
+  "output_filename": "compressed.mp4",
+  "encoder": "auto",
+  "resolution": "1280x720",
+  "quality": "medium",
+  "preset": "medium"
+}
+```
+
+#### 8. 获取视频信息
+```
+POST /video/info
+Content-Type: application/json
+
+{
+  "filepath": "uploads/video.mp4"
+}
+```
+
+#### 9. 下载文件
+```
+GET /download/<filename>
+```
+
+### 使用示例
+
+#### 通过Web界面（推荐）
+
+直接访问 `http://localhost:18787` 使用各个工具的图形界面。
+
+#### 通过API调用
+
+##### 文本处理工具
+```bash
+# 转大写
+curl -X POST http://localhost:18787/plugins/TextTool/execute \
+  -H "Content-Type: application/json" \
+  -d '{"text": "hello world", "operation": "uppercase"}'
+
+# 统计文本
+curl -X POST http://localhost:18787/plugins/TextTool/execute \
+  -H "Content-Type: application/json" \
+  -d '{"text": "hello world", "operation": "count"}'
+```
+
+##### 计算器工具
+```bash
+curl -X POST http://localhost:18787/plugins/Calculator/execute \
+  -H "Content-Type: application/json" \
+  -d '{"a": 10, "b": 5, "operation": "add"}'
+```
+
+##### 系统信息工具
+```bash
+curl -X POST http://localhost:18787/plugins/SystemInfo/execute \
+  -H "Content-Type: application/json" \
+  -d '{"info_type": "all"}'
+```
+
+##### 令牌生成器
+```bash
+curl -X POST http://localhost:18787/plugins/TokenGenerator/execute \
+  -H "Content-Type: application/json" \
+  -d '{"token_type": "uuid4"}'
+```
+
+##### JSON格式化工具
+```bash
+curl -X POST http://localhost:18787/plugins/JsonFormatter/execute \
+  -H "Content-Type: application/json" \
+  -d '{"json_text": "{\"name\":\"test\"}", "operation": "format"}'
+```
+
+##### 视频压缩工具
+```bash
+# 检测GPU
+curl -X POST http://localhost:18787/plugins/VideoCompressor/execute \
+  -H "Content-Type: application/json" \
+  -d '{"action": "check_gpu"}'
+
+# 获取视频信息
+curl -X POST http://localhost:18787/video/info \
+  -H "Content-Type: application/json" \
+  -d '{"filepath": "uploads/video.mp4"}'
+```
+
+## 开发新插件
+
+### 1. 创建插件文件
+
+在 `plugins/` 目录下创建新的Python文件，例如 `my_tool.py`
+
+### 2. 继承BasePlugin类
+
+```python
+from backend.base_plugin import BasePlugin
+from typing import Dict, Any, List
+
+
+class MyToolPlugin(BasePlugin):
+    """我的工具插件"""
+    
+    def __init__(self):
+        super().__init__()
+        self.name = "MyTool"
+        self.version = "1.0.0"
+        self.description = "我的工具描述"
+    
+    def get_parameters(self) -> List[Dict[str, Any]]:
+        """定义插件参数"""
+        return [
+            {
+                "name": "input",
+                "type": "string",
+                "required": True,
+                "description": "输入参数"
+            }
+        ]
+    
+    def execute(self, params: Dict[str, Any] = None) -> Dict[str, Any]:
+        """执行插件功能"""
+        if params is None:
+            params = {}
+        
+        # 处理逻辑
+        result = f"处理结果: {params.get('input')}"
+        
+        return {
+            "success": True,
+            "data": result,
+            "message": "执行成功"
+        }
+```
+
+### 3. 重新加载插件
+
+无需重启服务，调用重载接口：
+```bash
+curl -X POST http://localhost:18787/plugins/reload
+```
+
+## 视频压缩工具详细说明
+
+### 功能特性
+
+1. **GPU硬件加速**
+   - 自动检测并优先使用GPU编码器
+   - 支持 NVIDIA NVENC（h264_nvenc）
+   - 支持 AMD VCE（h264_amf）
+   - 支持 Intel Quick Sync（h264_qsv）
+   - 降级方案：CPU编码（libx264）
+
+2. **显卡信息显示**
+   - 自动检测NVIDIA显卡型号（如：NVIDIA GeForce RTX 3060）
+   - 显示显存容量（如：12 GB）
+   - 适用于NVIDIA显卡，需要nvidia-smi工具
+
+3. **7级质量选择**
+   - 极低质量：500kbps（预览用，文件极小）
+   - 低质量：1Mbps（快速分享）
+   - 中低质量：1.5Mbps（节省空间）
+   - 标准质量：2Mbps（推荐）
+   - 中高质量：3Mbps（清晰度好）
+   - 高质量：5Mbps（较大文件）
+   - 超高质量：8Mbps（接近原画）
+
+4. **分辨率调整**
+   - 保持原始分辨率
+   - 1080p (1920x1080)
+   - 720p (1280x720)
+   - 480p (854x480)
+   - 360p (640x360)
+
+5. **编码速度预设**
+   - 快速：处理速度快，文件稍大
+   - 中等：平衡速度和质量（推荐）
+   - 慢速：处理较慢，质量更好
+
+6. **智能预估**
+   - 实时预估压缩后文件大小
+   - 预估处理时间（考虑GPU加速）
+   - 显示压缩比例
+   - 参数调整时自动更新预估
+
+### 使用流程
+
+1. 打开视频压缩工具页面
+2. 查看显卡信息（确认硬件加速支持）
+3. 选择或拖拽视频文件上传
+4. 等待视频信息加载和预估计算
+5. 根据需求调整参数：
+   - 输出文件名
+   - 编码器（推荐使用"自动选择"）
+   - 分辨率
+   - 视频质量
+   - 编码速度
+6. 查看预估信息（文件大小、处理时间、压缩比）
+7. 点击"开始压缩"
+8. 等待处理完成
+9. 下载压缩后的视频
+
+### 系统要求
+
+- **FFmpeg**: 必须安装并添加到系统PATH
+- **存储空间**: 至少预留3倍于原视频大小的空间
+- **内存**: 建议4GB以上
+- **GPU驱动**: 
+  - NVIDIA显卡需要安装最新驱动
+  - AMD显卡需要安装最新驱动
+  - Intel显卡需要支持Quick Sync
+
+### 常见问题
+
+**Q: 为什么检测不到GPU？**
+A: 请确保：
+- 已安装最新显卡驱动
+- FFmpeg版本支持对应的GPU编码器
+- 显卡硬件支持视频编码功能
+
+**Q: 文件上传失败？**
+A: 检查：
+- 文件是否超过2GB（当前限制）
+- 磁盘空间是否充足
+- 文件是否为有效的视频格式
+
+**Q: 压缩很慢？**
+A: 可能原因：
+- 未使用GPU加速（检查编码器选择）
+- 选择了"慢速"编码预设
+- 原视频分辨率或码率很高
+- CPU性能不足（使用GPU可显著提升速度）
+
+**Q: 压缩后质量不满意？**
+A: 建议：
+- 提高质量等级
+- 保持原始分辨率
+- 使用"慢速"编码预设以获得更好质量
+
+## 配置
+
+在 [config.py](d:\MyCode\Python\miniTools\config.py) 中修改配置：
+
+```python
+HOST = '0.0.0.0'      # 服务监听地址
+PORT = 18787          # 服务端口
+PLUGIN_DIR = 'plugins' # 插件目录
+```
+
+在 [api_server.py](d:\MyCode\Python\miniTools\frontend\api_server.py) 中修改：
+
+```python
+MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 最大上传2GB
+```
+
+## 扩展性设计
+
+### 插件自动发现
+- 系统自动扫描plugins目录
+- 自动加载所有BasePlugin子类
+- 支持热重载
+
+### 统一接口规范
+- 所有插件继承BasePlugin
+- 统一的参数定义和验证
+- 统一的返回格式
+
+### 便利性功能
+- 参数自动验证
+- 错误自动处理
+- 日志自动记录
+- Web界面自动生成（可选）
+
+## 技术栈
+
+### 后端
+- Python 3.7+
+- Flask 3.0.0 - Web框架
+- Flask-CORS 4.0.0 - 跨域支持
+- psutil - 系统信息获取
+
+### 前端
+- 原生 HTML/CSS/JavaScript
+- 渐变色设计
+- 响应式布局
+- Fetch API
+
+### 视频处理
+- FFmpeg - 视频编码/解码
+- nvidia-smi - NVIDIA GPU信息（可选）
+- 支持多种GPU编码器
+
+## 贡献
+
+欢迎提交Issue和Pull Request！
+
+开发新插件的步骤：
+1. 在 `plugins/` 目录创建插件文件
+2. 继承 `BasePlugin` 类
+3. 实现 `get_parameters()` 和 `execute()` 方法
+4. （可选）在 `static/` 目录创建对应的HTML界面
+5. 调用 `/plugins/reload` 接口重新加载
+
+## 许可
+
+MIT License
+
+---
+
+## 更新日志
+
+### v1.3.0 (2025-12-28)
+- 🎮 优化显卡信息显示，支持显示NVIDIA显卡型号和显存容量
+- 📊 改进GPU状态展示，只显示主力显卡的详细信息
+
+### v1.2.0 (2025-12-28)
+- ✨ 新增视频压缩工具实时预估功能
+- 📈 显示预估文件大小、处理时间和压缩比
+- 🔄 参数调整时自动更新预估信息
+
+### v1.1.0 (2025-12-28)
+- 🎯 优化视频压缩质量选择，从4级扩展到7级
+- 📝 使用用户友好的质量描述替代技术性码率设置
+- 🎨 改进Web界面交互体验
+
+### v1.0.0 (2025-12-28)
+- 🎉 初始版本发布
+- ✅ 实现6个核心插件
+- 🌐 完整的Web界面支持
+- 🚀 GPU加速视频压缩功能

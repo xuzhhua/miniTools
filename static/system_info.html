@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统信息 - MiniTools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #e0e0e0;
+            color: #333;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #d0d0d0;
+        }
+        
+        .info-type-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .type-btn {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .type-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .type-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .get-info-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .get-info-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .result {
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+        }
+        
+        .info-section {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .info-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .info-value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            text-align: right;
+            word-break: break-all;
+            max-width: 60%;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            padding: 20px;
+            font-size: 16px;
+        }
+        
+        .copy-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+        
+        .copy-btn.copied {
+            background: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/ui" class="back-btn">← 返回主页</a>
+        
+        <h1>💻 系统信息</h1>
+        <p class="subtitle">MiniTools 统一工具平台</p>
+        
+        <div class="info-type-group">
+            <button class="type-btn active" data-type="all">全部信息</button>
+            <button class="type-btn" data-type="os">操作系统</button>
+            <button class="type-btn" data-type="python">Python环境</button>
+            <button class="type-btn" data-type="time">当前时间</button>
+        </div>
+        
+        <button class="get-info-btn" onclick="getSystemInfo()">获取系统信息</button>
+        
+        <div id="result" class="result"></div>
+    </div>
+    
+    <script>
+        let selectedType = 'all';
+        const API_BASE_URL = `${window.location.protocol}//${window.location.host}`;
+        
+        // 信息类型选择
+        document.querySelectorAll('.type-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedType = this.dataset.type;
+                
+                // 自动获取信息
+                getSystemInfo();
+            });
+        });
+        
+        // 获取系统信息
+        async function getSystemInfo() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="loading">正在获取系统信息...</div>';
+            resultDiv.classList.add('show');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins/SystemInfo/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        info_type: selectedType
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayInfo(data.data);
+                } else {
+                    resultDiv.innerHTML = `<div class="error-message">${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error-message">连接服务器失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 显示信息
+        function displayInfo(data) {
+            const resultDiv = document.getElementById('result');
+            let html = '';
+            
+            if (data.os) {
+                html += `
+                    <div class="info-section">
+                        <h3>🖥️ 操作系统信息</h3>
+                        ${createInfoItem('系统', data.os.system)}
+                        ${createInfoItem('版本', data.os.release)}
+                        ${createInfoItem('详细版本', data.os.version)}
+                        ${createInfoItem('架构', data.os.machine)}
+                        ${createInfoItem('处理器', data.os.processor)}
+                    </div>
+                `;
+            }
+            
+            if (data.python) {
+                html += `
+                    <div class="info-section">
+                        <h3>🐍 Python环境</h3>
+                        ${createInfoItem('Python版本', data.python.version)}
+                        ${createInfoItem('实现', data.python.implementation)}
+                        ${createInfoItem('编译器', data.python.compiler)}
+                    </div>
+                `;
+            }
+            
+            if (data.time) {
+                html += `
+                    <div class="info-section">
+                        <h3>⏰ 时间信息</h3>
+                        ${createInfoItem('当前时间', data.time.datetime)}
+                        ${createInfoItem('时间戳', data.time.timestamp)}
+                    </div>
+                `;
+            }
+            
+            if (data.environment) {
+                html += `
+                    <div class="info-section">
+                        <h3>🌍 环境信息</h3>
+                        ${createInfoItem('用户', data.environment.user)}
+                        ${createInfoItem('主目录', data.environment.home)}
+                        ${createInfoItem('当前目录', data.environment.cwd)}
+                    </div>
+                `;
+            }
+            
+            html += '<button class="copy-btn" onclick="copyAllInfo()">📋 复制全部信息</button>';
+            
+            resultDiv.innerHTML = html;
+            
+            // 保存数据用于复制
+            window.currentInfo = data;
+        }
+        
+        // 创建信息项
+        function createInfoItem(label, value) {
+            return `
+                <div class="info-item">
+                    <span class="info-label">${label}:</span>
+                    <span class="info-value">${escapeHtml(String(value))}</span>
+                </div>
+            `;
+        }
+        
+        // 复制全部信息
+        function copyAllInfo() {
+            if (!window.currentInfo) return;
+            
+            let text = '系统信息\n' + '='.repeat(50) + '\n\n';
+            text += JSON.stringify(window.currentInfo, null, 2);
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ 已复制';
+                btn.classList.add('copied');
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                alert('复制失败: ' + err);
+            });
+        }
+        
+        // HTML转义
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+        
+        // 页面加载时自动获取全部信息
+        window.addEventListener('load', () => {
+            getSystemInfo();
+        });
+    </script>
+</body>
+</html>

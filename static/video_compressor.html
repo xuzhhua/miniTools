@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频压缩 - MiniTools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #e0e0e0;
+            color: #333;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #d0d0d0;
+        }
+        
+        .gpu-status {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .gpu-status h3 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .gpu-item {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 15px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #e0e0e0;
+        }
+        
+        .gpu-item.available {
+            border-left-color: #28a745;
+        }
+        
+        .gpu-item .name {
+            font-weight: 600;
+            color: #333;
+            min-width: 150px;
+        }
+        
+        .gpu-item .status {
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 2px;
+        }
+        
+        .status.available {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.unavailable {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            background: #f0f2ff;
+            border-color: #5568d3;
+        }
+        
+        .upload-area.drag-over {
+            background: #e7eaff;
+            border-color: #4450b5;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .upload-text {
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .upload-hint {
+            color: #999;
+            font-size: 14px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-info {
+            background: #e7f3ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .file-info h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .info-value {
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .control-group.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        label {
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        select, input[type="text"], input[type="number"] {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .compress-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .compress-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .compress-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .clear-btn {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .clear-btn:hover {
+            background: #5a6268;
+        }
+        
+        .progress {
+            display: none;
+            margin-top: 20px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .result h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .result.success h3 {
+            color: #155724;
+        }
+        
+        .result.error h3 {
+            color: #721c24;
+        }
+        
+        .result-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .result-item {
+            text-align: center;
+        }
+        
+        .result-item .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .result-item .value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .tips {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        
+        .tips h4 {
+            color: #856404;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .tips ul {
+            margin-left: 20px;
+            color: #856404;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+        
+        @media (max-width: 768px) {
+            .controls, .info-grid, .result-details {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/ui" class="back-btn">← 返回主页</a>
+        <h1>🎬 视频压缩</h1>
+        <p class="subtitle">MiniTools 统一工具平台 - 支持GPU加速</p>
+        
+        <!-- GPU状态显示 -->
+        <div class="gpu-status">
+            <h3>🎮 显卡信息</h3>
+            <div id="gpu-list">
+                <div style="text-align: center; color: #999;">正在检测...</div>
+            </div>
+        </div>
+        
+        <!-- 文件上传区域 -->
+        <div class="upload-area" id="upload-area">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">点击选择或拖拽视频文件到此处</div>
+            <div class="upload-hint">支持 MP4, AVI, MOV, MKV 等常见格式</div>
+            <input type="file" id="file-input" class="file-input" accept="video/*">
+        </div>
+        
+        <!-- 文件信息显示 -->
+        <div class="file-info" id="file-info">
+            <h3>📊 文件信息</h3>
+            <div class="info-grid" id="info-grid">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+        
+        <!-- 压缩参数设置 -->
+        <div class="controls">
+            <div class="control-group full-width">
+                <label for="output-filename">输出文件名</label>
+                <input type="text" id="output-filename" placeholder="compressed_video.mp4" value="compressed_video.mp4">
+            </div>
+            
+            <div class="control-group">
+                <label for="encoder">编码器</label>
+                <select id="encoder">
+                    <option value="auto">自动选择（推荐）</option>
+                    <option value="h264_nvenc">NVIDIA NVENC</option>
+                    <option value="h264_amf">AMD VCE</option>
+                    <option value="h264_qsv">Intel Quick Sync</option>
+                    <option value="libx264">CPU (libx264)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="resolution">分辨率</label>
+                <select id="resolution">
+                    <option value="original">保持原始</option>
+                    <option value="1920x1080">1080p (1920x1080)</option>
+                    <option value="1280x720">720p (1280x720)</option>
+                    <option value="854x480">480p (854x480)</option>
+                    <option value="640x360">360p (640x360)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="quality">视频质量</label>
+                <select id="quality">
+                    <option value="very-low">极低质量（预览用，文件极小）</option>
+                    <option value="low">低质量（快速分享）</option>
+                    <option value="medium-low">中低质量（节省空间）</option>
+                    <option value="medium" selected>标准质量（推荐）</option>
+                    <option value="medium-high">中高质量（清晰度好）</option>
+                    <option value="high">高质量（较大文件）</option>
+                    <option value="ultra">超高质量（接近原画）</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="preset">编码速度</label>
+                <select id="preset">
+                    <option value="fast">快速</option>
+                    <option value="medium" selected>中等</option>
+                    <option value="slow">慢速（更高质量）</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- 预估信息 -->
+        <div class="stats" id="estimate-info" style="display: none;">
+            <h3 style="margin-bottom: 15px; color: #333; font-size: 16px;">📈 预估信息</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">预计文件大小</span>
+                    <span class="stat-value" id="estimated-size">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">预计处理时间</span>
+                    <span class="stat-value" id="estimated-time">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">预计压缩率</span>
+                    <span class="stat-value" id="estimated-ratio">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 按钮组 -->
+        <div class="button-group">
+            <button class="compress-btn" id="compress-btn" disabled>开始压缩</button>
+            <button class="clear-btn" id="clear-btn">清除</button>
+        </div>
+        
+        <!-- 进度显示 -->
+        <div class="progress" id="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill">0%</div>
+            </div>
+            <div class="progress-text" id="progress-text">正在压缩...</div>
+        </div>
+        
+        <!-- 结果显示 -->
+        <div class="result" id="result"></div>
+        
+        <!-- 使用提示 -->
+        <div class="tips">
+            <h4>💡 使用提示</h4>
+            <ul>
+                <li>支持最大2GB的视频文件上传（如超出请先压缩后再上传）</li>
+                <li>GPU加速需要安装对应驱动和ffmpeg（带GPU支持编译）</li>
+                <li>建议先使用"自动选择"编码器，系统会自动检测最佳方案</li>
+                <li>降低分辨率和视频质量可以显著减小文件大小</li>
+                <li>慢速编码会获得更好的压缩效果，但处理时间更长</li>
+                <li>质量推荐：极低/低质量适合预览；中低/标准适合日常；中高/高/超高适合保存重要视频</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE_URL = `${window.location.protocol}//${window.location.host}`;
+        let uploadedFilePath = null;
+        let selectedFile = null;
+        let videoMetadata = null; // 存储视频元数据
+        
+        // 页面加载时检测GPU
+        window.addEventListener('DOMContentLoaded', checkGPU);
+        
+        // 检测GPU支持
+        async function checkGPU() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins/VideoCompressor/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'check_gpu'
+                    })
+                });
+                
+                const result = await response.json();
+                displayGPUStatus(result);
+            } catch (error) {
+                document.getElementById('gpu-list').innerHTML = 
+                    '<div style="color: #dc3545;">检测失败: ' + error.message + '</div>';
+            }
+        }
+        
+        // 显示GPU状态
+        function displayGPUStatus(result) {
+            const gpuList = document.getElementById('gpu-list');
+            
+            if (!result.success) {
+                gpuList.innerHTML = `<div style="color: #dc3545;">${result.error}</div>`;
+                return;
+            }
+            
+            const encoders = result.encoders;
+            let html = '';
+            
+            // 优先显示可用的主力显卡信息
+            let primaryGpu = null;
+            if (encoders.nvidia && encoders.nvidia.available) {
+                primaryGpu = encoders.nvidia;
+            } else if (encoders.amd && encoders.amd.available) {
+                primaryGpu = encoders.amd;
+            } else if (encoders.intel && encoders.intel.available) {
+                primaryGpu = encoders.intel;
+            }
+            
+            if (primaryGpu) {
+                // 显示主力显卡信息
+                html += `<div class="gpu-item available">`;
+                html += `<span class="name">${primaryGpu.name}</span>`;
+                
+                // 显示显卡型号和显存（如果有）
+                if (primaryGpu.gpu_model && primaryGpu.gpu_model !== '未知') {
+                    html += `<span class="status available">型号: ${primaryGpu.gpu_model}</span>`;
+                }
+                if (primaryGpu.gpu_memory && primaryGpu.gpu_memory !== '未知') {
+                    html += `<span class="status available">显存: ${primaryGpu.gpu_memory}</span>`;
+                }
+                
+                // 如果没有详细信息，只显示可用状态
+                if (!primaryGpu.gpu_model || primaryGpu.gpu_model === '未知') {
+                    html += `<span class="status available">硬件加速可用</span>`;
+                }
+                
+                html += `</div>`;
+            } else if (encoders.cpu && encoders.cpu.available) {
+                // 没有GPU，显示CPU编码
+                html += `
+                    <div class="gpu-item unavailable">
+                        <span class="name">无可用GPU</span>
+                        <span class="status unavailable">将使用CPU编码</span>
+                    </div>
+                `;
+            } else {
+                html = '<div style="color: #dc3545;">未检测到可用的编码器</div>';
+            }
+            
+            gpuList.innerHTML = html;
+        }
+        
+        // 文件上传区域事件
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+        
+        // 处理文件选择并上传
+        async function handleFileSelect(file) {
+            selectedFile = file;
+            
+            // 显示上传中状态
+            const progress = document.getElementById('progress');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            
+            progress.style.display = 'block';
+            progressText.textContent = '正在上传文件...';
+            progressFill.style.width = '0%';
+            progressFill.textContent = '0%';
+            
+            try {
+                // 上传文件
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch(`${API_BASE_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // 检查HTTP状态码
+                if (response.status === 413) {
+                    throw new Error('文件太大，最大支持2GB。建议：1) 使用更小的文件，2) 先用其他工具压缩后再上传');
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    uploadedFilePath = result.filepath;
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    
+                    // 显示文件信息
+                    await displayFileInfo(result);
+                    
+                    // 获取详细视频信息
+                    await getVideoInfo(result.filepath);
+                    
+                    document.getElementById('compress-btn').disabled = false;
+                    progress.style.display = 'none';
+                    
+                    showMessage('文件上传成功，请配置压缩参数', 'success');
+                } else {
+                    throw new Error(result.error || '上传失败');
+                }
+            } catch (error) {
+                progress.style.display = 'none';
+                showMessage('文件上传失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 显示文件信息
+        async function displayFileInfo(uploadResult) {
+            const fileInfo = document.getElementById('file-info');
+            const infoGrid = document.getElementById('info-grid');
+            
+            infoGrid.innerHTML = `
+                <div class="info-item">
+                    <div class="info-label">文件名</div>
+                    <div class="info-value">${uploadResult.filename}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">文件大小</div>
+                    <div class="info-value">${formatSize(uploadResult.size)}</div>
+                </div>
+            `;
+            
+            fileInfo.style.display = 'block';
+        }
+        
+        // 获取视频详细信息
+        async function getVideoInfo(filepath) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/video/info`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filepath: filepath })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.info) {
+                    const info = result.info;
+                    videoMetadata = info; // 保存视频元数据
+                    const infoGrid = document.getElementById('info-grid');
+                    
+                    let html = infoGrid.innerHTML;
+                    
+                    if (info.video) {
+                        html += `
+                            <div class="info-item">
+                                <div class="info-label">分辨率</div>
+                                <div class="info-value">${info.video.width}x${info.video.height}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">编码格式</div>
+                                <div class="info-value">${info.video.codec || 'N/A'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">时长</div>
+                                <div class="info-value">${formatDuration(info.duration)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">码率</div>
+                                <div class="info-value">${formatBitrate(info.bitrate)}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    infoGrid.innerHTML = html;
+                    
+                    // 初始计算预估信息
+                    updateEstimate();
+                }
+            } catch (error) {
+                console.error('获取视频信息失败:', error);
+            }
+        }
+        
+        // 更新预估信息
+        function updateEstimate() {
+            if (!videoMetadata || !videoMetadata.duration) {
+                return;
+            }
+            
+            const estimateDiv = document.getElementById('estimate-info');
+            const quality = document.getElementById('quality').value;
+            const resolution = document.getElementById('resolution').value;
+            const preset = document.getElementById('preset').value;
+            
+            // 质量到码率映射
+            const qualityToBitrate = {
+                'very-low': 500,    // kbps
+                'low': 1000,
+                'medium-low': 1500,
+                'medium': 2000,
+                'medium-high': 3000,
+                'high': 5000,
+                'ultra': 8000
+            };
+            
+            const targetBitrate = qualityToBitrate[quality] || 2000; // kbps
+            const duration = videoMetadata.duration; // 秒
+            
+            // 计算预估文件大小（考虑音频流约128kbps）
+            const audioBitrate = 128; // kbps
+            const totalBitrate = targetBitrate + audioBitrate;
+            const estimatedBytes = (totalBitrate * duration * 1000) / 8; // 转换为字节
+            
+            // 计算分辨率调整系数
+            let resolutionFactor = 1.0;
+            if (resolution !== 'original' && videoMetadata.video) {
+                const [targetWidth, targetHeight] = resolution.split('x').map(Number);
+                const originalPixels = videoMetadata.video.width * videoMetadata.video.height;
+                const targetPixels = targetWidth * targetHeight;
+                resolutionFactor = Math.min(targetPixels / originalPixels, 1.0);
+            }
+            
+            const finalEstimatedSize = estimatedBytes * resolutionFactor;
+            
+            // 计算压缩率
+            const originalSize = videoMetadata.size || 0;
+            const compressionRatio = originalSize > 0 
+                ? ((originalSize - finalEstimatedSize) / originalSize * 100).toFixed(1)
+                : 0;
+            
+            // 预估处理时间（基于视频时长和编码速度）
+            // 编码速度系数：fast=0.3x, medium=0.5x, slow=0.8x（相对于视频时长）
+            const presetFactors = {
+                'fast': 0.3,
+                'medium': 0.5,
+                'slow': 0.8
+            };
+            const presetFactor = presetFactors[preset] || 0.5;
+            
+            // GPU加速可以提速约3-5倍
+            const encoder = document.getElementById('encoder').value;
+            const isGPU = encoder !== 'libx264' && encoder !== 'auto';
+            const gpuSpeedUp = isGPU ? 0.25 : 1.0; // GPU加速降低到25%时间
+            
+            const estimatedSeconds = duration * presetFactor * gpuSpeedUp * resolutionFactor;
+            
+            // 显示预估信息
+            document.getElementById('estimated-size').textContent = formatSize(finalEstimatedSize);
+            document.getElementById('estimated-time').textContent = formatDuration(estimatedSeconds);
+            document.getElementById('estimated-ratio').textContent = 
+                compressionRatio > 0 ? `减少 ${compressionRatio}%` : '可能增大';
+            
+            estimateDiv.style.display = 'block';
+        }
+        
+        // 监听参数变化
+        document.getElementById('quality').addEventListener('change', updateEstimate);
+        document.getElementById('resolution').addEventListener('change', updateEstimate);
+        document.getElementById('preset').addEventListener('change', updateEstimate);
+        document.getElementById('encoder').addEventListener('change', updateEstimate);
+        
+        // 开始压缩
+        document.getElementById('compress-btn').addEventListener('click', compressVideo);
+        
+        async function compressVideo() {
+            if (!uploadedFilePath) {
+                showMessage('请先上传视频文件', 'error');
+                return;
+            }
+            
+            const outputFilename = document.getElementById('output-filename').value || 'compressed_video.mp4';
+            
+            // 验证输出文件名
+            if (!outputFilename.match(/\.(mp4|avi|mkv|mov)$/i)) {
+                showMessage('输出文件名必须包含视频格式后缀（如 .mp4）', 'error');
+                return;
+            }
+            
+            const progress = document.getElementById('progress');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            
+            progress.style.display = 'block';
+            progressText.textContent = '正在压缩视频，请耐心等待...';
+            progressFill.style.width = '50%';
+            progressFill.textContent = '处理中...';
+            
+            document.getElementById('compress-btn').disabled = true;
+            
+            // 将质量选项映射到码率
+            const qualityToBitrate = {
+                'very-low': '500k',    // 极低质量
+                'low': '1M',           // 低质量
+                'medium-low': '1.5M',  // 中低质量
+                'medium': '2M',        // 标准质量
+                'medium-high': '3M',   // 中高质量
+                'high': '5M',          // 高质量
+                'ultra': '8M'          // 超高质量
+            };
+            
+            const quality = document.getElementById('quality').value;
+            const bitrate = qualityToBitrate[quality] || '2M';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/video/compress`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        input_file: uploadedFilePath,
+                        output_filename: outputFilename,
+                        encoder: document.getElementById('encoder').value,
+                        resolution: document.getElementById('resolution').value,
+                        bitrate: bitrate,
+                        preset: document.getElementById('preset').value
+                    })
+                });
+                
+                const result = await response.json();
+                
+                progressFill.style.width = '100%';
+                progressFill.textContent = '100%';
+                
+                if (result.success) {
+                    displayResult(result.result, outputFilename);
+                    setTimeout(() => {
+                        progress.style.display = 'none';
+                    }, 1000);
+                } else {
+                    progress.style.display = 'none';
+                    showMessage('压缩失败: ' + (result.error || result.message), 'error');
+                    document.getElementById('compress-btn').disabled = false;
+                }
+            } catch (error) {
+                progress.style.display = 'none';
+                showMessage('压缩过程出错: ' + error.message, 'error');
+                document.getElementById('compress-btn').disabled = false;
+            }
+        }
+        
+        // 显示压缩结果
+        function displayResult(result, outputFilename) {
+            const resultDiv = document.getElementById('result');
+            
+            const inputSize = formatSize(result.input_size);
+            const outputSize = formatSize(result.output_size);
+            const ratio = result.compression_ratio;
+            
+            resultDiv.className = 'result success';
+            resultDiv.innerHTML = `
+                <h3>✅ 压缩完成</h3>
+                <div class="result-details">
+                    <div class="result-item">
+                        <div class="label">原始大小</div>
+                        <div class="value">${inputSize}</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="label">压缩后大小</div>
+                        <div class="value">${outputSize}</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="label">压缩率</div>
+                        <div class="value">${ratio}%</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; text-align: center;">
+                    <button onclick="downloadResult('${outputFilename}')" 
+                            style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                        📥 下载压缩后的视频
+                    </button>
+                </div>
+            `;
+            resultDiv.style.display = 'block';
+            document.getElementById('compress-btn').disabled = false;
+        }
+        
+        // 下载结果
+        function downloadResult(filename) {
+            window.location.href = `${API_BASE_URL}/download/${filename}`;
+        }
+        
+        // 清除
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            selectedFile = null;
+            uploadedFilePath = null;
+            videoMetadata = null;
+            fileInput.value = '';
+            document.getElementById('file-info').style.display = 'none';
+            document.getElementById('estimate-info').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('progress').style.display = 'none';
+            document.getElementById('compress-btn').disabled = true;
+            document.getElementById('output-filename').value = 'compressed_video.mp4';
+            document.getElementById('output-filename').value = 'compressed_video.mp4';
+        });
+        
+        // 格式化文件大小
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 格式化时长
+        function formatDuration(seconds) {
+            if (!seconds) return 'N/A';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` 
+                         : `${m}:${s.toString().padStart(2, '0')}`;
+        }
+        
+        // 格式化码率
+        function formatBitrate(bps) {
+            if (!bps) return 'N/A';
+            const kbps = bps / 1000;
+            const mbps = kbps / 1000;
+            return mbps >= 1 ? `${mbps.toFixed(2)} Mbps` : `${kbps.toFixed(0)} Kbps`;
+        }
+        
+        // 显示消息
+        function showMessage(message, type) {
+            const result = document.getElementById('result');
+            result.className = 'result ' + type;
+            result.innerHTML = `<h3>${message}</h3>`;
+            result.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

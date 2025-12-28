@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniTools - 统一工具管理平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            padding: 40px 20px;
+        }
+        
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        
+        .tool-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .tool-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .tool-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .tool-description {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .tool-features {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0;
+        }
+        
+        .tool-features li {
+            color: #555;
+            font-size: 13px;
+            margin: 5px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .tool-features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .tool-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #667eea;
+            color: white;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .info-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 40px;
+        }
+        
+        .info-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .info-section p {
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        
+        .api-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            margin: 15px 0;
+        }
+        
+        .api-info code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            opacity: 0.8;
+        }
+        
+        .loading {
+            text-align: center;
+            color: white;
+            padding: 40px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛠️ MiniTools</h1>
+        <p>统一工具管理平台 - 一站式解决方案</p>
+    </div>
+    
+    <div class="container">
+        <div id="stats" class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="plugin-count">-</div>
+                <div class="stat-label">可用工具</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">✓</div>
+                <div class="stat-label">服务运行中</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">∞</div>
+                <div class="stat-label">随时扩展</div>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading">正在加载工具列表...</div>
+        <div id="tools-grid" class="tools-grid" style="display: none;"></div>
+        
+        <div class="info-section">
+            <h2>📖 使用说明</h2>
+            <p>MiniTools 是一个插件化的工具管理平台，提供统一的Web界面和API接口。所有工具都可以通过Web界面直接使用，也可以通过API进行集成。</p>
+            
+            <div class="api-info">
+                <strong>API基础地址：</strong> <code id="api-url">-</code><br>
+                <strong>获取工具列表：</strong> <code>GET /plugins</code><br>
+                <strong>执行工具：</strong> <code>POST /plugins/{name}/execute</code>
+            </div>
+            
+            <h2 style="margin-top: 30px;">✨ 平台特性</h2>
+            <ul class="tool-features" style="padding-left: 0;">
+                <li>插件化架构，易于扩展</li>
+                <li>统一的Web界面和API接口</li>
+                <li>支持热重载，无需重启服务</li>
+                <li>跨域支持，便于前端集成</li>
+                <li>完善的错误处理和日志记录</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>© 2025 MiniTools - 让工具管理更简单</p>
+    </div>
+    
+    <script>
+        const API_BASE_URL = `${window.location.protocol}//${window.location.host}`;
+        
+        // 工具配置（图标、描述等）
+        const toolConfigs = {
+            'Calculator': {
+                icon: '🔢',
+                title: '计算器',
+                description: '提供基本数学运算和科学计算功能',
+                features: ['四则运算', '科学计算', '三角函数', '对数函数'],
+                url: '/ui/calculator',
+                badge: '基础工具'
+            },
+            'TextTool': {
+                icon: '📝',
+                title: '文本处理',
+                description: '提供文本转换和统计功能',
+                features: ['大小写转换', '文本反转', '字符统计', '词数统计'],
+                url: '/ui/text',
+                badge: '文本工具'
+            },
+            'SystemInfo': {
+                icon: '💻',
+                title: '系统信息',
+                description: '获取系统和环境信息',
+                features: ['操作系统信息', 'Python版本', '当前时间', '环境变量'],
+                url: '/ui/system',
+                badge: '系统工具'
+            },
+            'TokenGenerator': {
+                icon: '🔐',
+                title: 'Token生成器',
+                description: '生成各种类型的安全Token',
+                features: ['UUID生成', 'API密钥', '随机字符串', '批量生成'],
+                url: '/ui/token',
+                badge: '安全工具'
+            },
+            'JsonFormatter': {
+                icon: '📋',
+                title: 'JSON格式化',
+                description: 'JSON数据格式化和验证工具',
+                features: ['格式化美化', '压缩精简', '语法验证', '结构分析'],
+                url: '/ui/json',
+                badge: '数据工具'
+            },
+            'VideoCompressor': {
+                icon: '🎬',
+                title: '视频压缩',
+                description: '视频压缩工具，支持GPU加速',
+                features: ['GPU加速', '多种编码器', '分辨率调整', '码率控制'],
+                url: '/ui/video',
+                badge: '媒体工具'
+            }
+        };
+        
+        // 加载工具列表
+        async function loadTools() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('plugin-count').textContent = data.count;
+                    displayTools(data.data);
+                } else {
+                    showError('加载工具列表失败');
+                }
+            } catch (error) {
+                showError('连接服务器失败: ' + error.message);
+            }
+        }
+        
+        // 显示工具卡片
+        function displayTools(plugins) {
+            const grid = document.getElementById('tools-grid');
+            const loading = document.getElementById('loading');
+            
+            let html = '';
+            
+            plugins.forEach(plugin => {
+                const config = toolConfigs[plugin.name] || {
+                    icon: '🔧',
+                    title: plugin.name,
+                    description: plugin.description,
+                    features: ['查看详情了解更多'],
+                    url: `/plugins/${plugin.name}/execute`,
+                    badge: '工具'
+                };
+                
+                const featuresHtml = config.features
+                    .map(f => `<li>${f}</li>`)
+                    .join('');
+                
+                html += `
+                    <a href="${config.url}" class="tool-card">
+                        <div class="tool-icon">${config.icon}</div>
+                        <div class="tool-title">${config.title}</div>
+                        <span class="tool-badge">${config.badge}</span>
+                        <div class="tool-description">${config.description}</div>
+                        <ul class="tool-features">
+                            ${featuresHtml}
+                        </ul>
+                    </a>
+                `;
+            });
+            
+            grid.innerHTML = html;
+            loading.style.display = 'none';
+            grid.style.display = 'grid';
+        }
+        
+        // 显示错误
+        function showError(message) {
+            const loading = document.getElementById('loading');
+            loading.innerHTML = `<div style="color: #fee; background: rgba(255,0,0,0.2); padding: 20px; border-radius: 10px;">${message}</div>`;
+        }
+        
+        // 更新API URL显示
+        document.getElementById('api-url').textContent = API_BASE_URL;
+        
+        // 页面加载时获取工具列表
+        loadTools();
+    </script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本处理 - MiniTools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #e0e0e0;
+            color: #333;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #d0d0d0;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: all 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .operations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .op-btn {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .op-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .op-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .process-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .process-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .result {
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+        }
+        
+        .result-box {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .result-content {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .stats-box {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        
+        .stats-item {
+            display: inline-block;
+            margin-right: 20px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .stats-item strong {
+            color: #333;
+        }
+        
+        .action-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .copy-btn, .clear-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .copy-btn {
+            background: #667eea;
+            color: white;
+        }
+        
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+        
+        .copy-btn.copied {
+            background: #28a745;
+        }
+        
+        .clear-btn {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .clear-btn:hover {
+            background: #c82333;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/ui" class="back-btn">← 返回主页</a>
+        
+        <h1>📝 文本处理工具</h1>
+        <p class="subtitle">MiniTools 统一工具平台</p>
+        
+        <div class="input-group">
+            <label for="textInput">输入文本</label>
+            <textarea id="textInput" placeholder="请输入要处理的文本...">Hello World</textarea>
+        </div>
+        
+        <label>选择操作</label>
+        <div class="operations">
+            <button class="op-btn active" data-op="uppercase">转大写</button>
+            <button class="op-btn" data-op="lowercase">转小写</button>
+            <button class="op-btn" data-op="reverse">文本反转</button>
+            <button class="op-btn" data-op="count">统计信息</button>
+        </div>
+        
+        <button class="process-btn" onclick="processText()">处理文本</button>
+        
+        <div id="result" class="result"></div>
+    </div>
+    
+    <script>
+        let selectedOperation = 'uppercase';
+        const API_BASE_URL = `${window.location.protocol}//${window.location.host}`;
+        
+        // 操作选择
+        document.querySelectorAll('.op-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedOperation = this.dataset.op;
+            });
+        });
+        
+        // 处理文本
+        async function processText() {
+            const text = document.getElementById('textInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!text.trim()) {
+                resultDiv.innerHTML = '<div class="error-message">请输入文本内容</div>';
+                resultDiv.classList.add('show');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins/TextTool/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        operation: selectedOperation
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResult(data.data);
+                } else {
+                    resultDiv.innerHTML = `<div class="error-message">${data.message}</div>`;
+                    resultDiv.classList.add('show');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error-message">连接服务器失败: ${error.message}</div>`;
+                resultDiv.classList.add('show');
+            }
+        }
+        
+        // 显示结果
+        function displayResult(data) {
+            const resultDiv = document.getElementById('result');
+            let html = '';
+            
+            if (typeof data === 'object' && data.length !== undefined) {
+                // 统计信息
+                html = `
+                    <div class="result-box">
+                        <h3 style="color: #667eea; margin-bottom: 15px;">📊 统计结果</h3>
+                        <div class="stats-box">
+                            <div class="stats-item"><strong>总字符数:</strong> ${data.length}</div>
+                            <div class="stats-item"><strong>总词数:</strong> ${data.words}</div>
+                            <div class="stats-item"><strong>总行数:</strong> ${data.lines}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // 文本处理结果
+                html = `
+                    <div class="result-box">
+                        <h3 style="color: #667eea; margin-bottom: 15px;">✨ 处理结果</h3>
+                        <div class="result-content">${escapeHtml(String(data))}</div>
+                        <div class="action-btns">
+                            <button class="copy-btn" onclick="copyResult()">📋 复制结果</button>
+                            <button class="clear-btn" onclick="clearResult()">🗑️ 清除</button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultDiv.innerHTML = html;
+            resultDiv.classList.add('show');
+            
+            // 保存结果用于复制
+            window.currentResult = data;
+        }
+        
+        // 复制结果
+        function copyResult() {
+            const text = typeof window.currentResult === 'object' 
+                ? JSON.stringify(window.currentResult, null, 2)
+                : String(window.currentResult);
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ 已复制';
+                btn.classList.add('copied');
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                alert('复制失败: ' + err);
+            });
+        }
+        
+        // 清除结果
+        function clearResult() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.classList.remove('show');
+            window.currentResult = null;
+        }
+        
+        // HTML转义
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+        
+        // 回车键处理
+        document.getElementById('textInput').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                processText();
+            }
+        });
+    </script>
+</body>
+</html>
