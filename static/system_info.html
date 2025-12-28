@@ -143,14 +143,19 @@
         .info-label {
             font-weight: 600;
             color: #555;
+            min-width: 120px;
         }
         
         .info-value {
             color: #333;
-            font-family: 'Courier New', monospace;
             text-align: right;
-            word-break: break-all;
-            max-width: 60%;
+            word-break: break-word;
+            max-width: 65%;
+            line-height: 1.5;
+        }
+        
+        .info-value.mono {
+            font-family: 'Courier New', monospace;
         }
         
         .error-message {
@@ -200,6 +205,7 @@
         <div class="info-type-group">
             <button class="type-btn active" data-type="all">全部信息</button>
             <button class="type-btn" data-type="os">操作系统</button>
+            <button class="type-btn" data-type="cpu">处理器</button>
             <button class="type-btn" data-type="python">Python环境</button>
             <button class="type-btn" data-type="time">当前时间</button>
         </div>
@@ -266,10 +272,47 @@
                         ${createInfoItem('系统', data.os.system)}
                         ${createInfoItem('版本', data.os.release)}
                         ${createInfoItem('详细版本', data.os.version)}
-                        ${createInfoItem('架构', data.os.machine)}
-                        ${createInfoItem('处理器', data.os.processor)}
-                    </div>
+                        ${createInfoItem('架构', data.os.architecture)}
                 `;
+                
+                // 内存信息
+                if (data.os.memory && !data.os.memory.error) {
+                    html += `
+                        ${createInfoItem('内存总量', data.os.memory.total)}
+                        ${createInfoItem('可用内存', data.os.memory.available)}
+                        ${createInfoItem('已用内存', data.os.memory.used + ' (' + data.os.memory.percent + ')')}
+                    `;
+                }
+                
+                // 显卡信息
+                if (data.os.gpu) {
+                    html += `${createInfoItem('显卡', data.os.gpu.model)}`;
+                    if (data.os.gpu.memory) {
+                        html += `${createInfoItem('显存', data.os.gpu.memory)}`;
+                    }
+                }
+                
+                html += `</div>`;
+            }
+            
+            if (data.cpu) {
+                html += `
+                    <div class="info-section">
+                        <h3>⚡ 处理器信息</h3>
+                        ${createInfoItem('型号', data.cpu.model)}
+                        ${createInfoItem('物理核心数', data.cpu.physical_cores + ' 核')}
+                        ${createInfoItem('逻辑核心数', data.cpu.logical_cores + ' 核（含超线程）')}
+                `;
+                
+                // 频率信息（统一使用GHz）
+                if (data.cpu.frequency && typeof data.cpu.frequency === 'object') {
+                    html += `
+                        ${createInfoItem('当前频率', data.cpu.frequency.current)}
+                        ${data.cpu.frequency.max !== '未知' ? createInfoItem('最大频率', data.cpu.frequency.max) : ''}
+                    `;
+                }
+                
+                html += `</div>`;
             }
             
             if (data.python) {
