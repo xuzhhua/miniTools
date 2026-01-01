@@ -30,7 +30,8 @@ miniTools/
 │   ├── system_info.py    # 系统信息工具
 │   ├── token_generator.py# 令牌生成器
 │   ├── json_formatter.py # JSON格式化工具
-│   └── video_compressor.py# 视频压缩工具
+│   ├── video_compressor.py# 视频压缩工具
+│   └── ebook_converter.py# 电子书转换工具
 ├── static/               # 静态文件（Web界面）
 │   ├── index.html        # 主页
 │   ├── calculator.html
@@ -38,7 +39,8 @@ miniTools/
 │   ├── system_info.html
 │   ├── token_generator.html
 │   ├── json_formatter.html
-│   └── video_compressor.html
+│   ├── video_compressor.html
+│   └── ebook_converter.html
 ├── uploads/              # 上传文件目录
 ├── outputs/              # 输出文件目录
 ├── config.py             # 配置文件
@@ -99,6 +101,27 @@ miniTools/
 - **进度显示**: 实时显示上传和处理进度
 - Web界面：完整的视频压缩流程
 
+### 7. 电子书转换与翻译 (EbookConverter) ⭐⭐
+- **格式转换**：
+  - 支持格式：PDF、EPUB、MOBI、TXT、AZW3、DOCX
+  - 使用Calibre的ebook-convert进行高质量转换
+  - 批量转换支持
+- **OCR识别**：
+  - 扫描版PDF文字识别
+  - 支持中英文混合识别
+  - 使用Tesseract OCR引擎
+  - 自动生成可搜索的PDF
+- **AI翻译**：
+  - 支持Ollama本地翻译（完全免费）
+  - 支持DeepSeek云端翻译（需API密钥）
+  - 双语对照模式（原文+译文段落对照）
+  - 纯译文模式
+  - 支持多种语言：简体中文、英文、日文、韩文
+  - **配置说明**: 详见 [EBOOK_CONFIG.md](EBOOK_CONFIG.md)
+  - **错误排查**: 详见 [TRANSLATION_ERROR_FIX.md](TRANSLATION_ERROR_FIX.md)
+- **元数据提取**：自动提取书名、作者、页数、语言等信息
+- Web界面：直观的三标签页设计（格式转换、OCR、翻译）
+
 ## 安装
 
 ### 前置依赖
@@ -110,8 +133,20 @@ miniTools/
    - Linux: `sudo apt install ffmpeg`
    - macOS: `brew install ffmpeg`
 4. **nvidia-smi** (可选，用于NVIDIA显卡信息显示)
-   - 随NVIDIA显卡驱动自动安装
-
+   - 随NVIDIA显卡驱动自动安装5. **Calibre** (电子书转换功能必需)
+   - Windows: 从 [Calibre官网](https://calibre-ebook.com/download) 下载安装
+   - Linux: `sudo apt install calibre`
+   - macOS: `brew install calibre`
+6. **Tesseract OCR** (扫描版PDF识别功能可选)
+   - **安装指南**: 详见 [TESSERACT_GUIDE.md](TESSERACT_GUIDE.md)
+   - Windows: 从 [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) 下载安装,安装时选择中文语言包
+   - Linux: `sudo apt install tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng`
+   - macOS: `brew install tesseract tesseract-lang`
+7. **OCRmyPDF** (扫描版PDF识别功能可选)
+   - 安装命令: `pip install ocrmypdf`
+8. **Ollama** (本地AI翻译功能可选)
+   - 从 [Ollama官网](https://ollama.ai/) 下载安装
+   - 安装后运行: `ollama pull qwen:7b` 或其他支持的模型
 ### 安装步骤
 
 1. 克隆或下载本项目
@@ -292,6 +327,50 @@ curl -X POST http://localhost:18787/video/info \
   -d '{"filepath": "uploads/video.mp4"}'
 ```
 
+##### 电子书转换工具
+```bash
+# 检查依赖
+curl -X POST http://localhost:18787/plugins/EbookConverter/execute \
+  -H "Content-Type: application/json" \
+  -d '{"action": "check_dependencies"}'
+
+# 格式转换
+curl -X POST http://localhost:18787/plugins/EbookConverter/execute \
+  -H "Content-Type: application/json" \
+  -d '{"action": "convert", "input_file": "uploads/book.epub", "output_format": "pdf"}'
+
+# OCR识别
+curl -X POST http://localhost:18787/plugins/EbookConverter/execute \
+  -H "Content-Type: application/json" \
+  -d '{"action": "ocr", "input_file": "uploads/scanned.pdf"}'
+
+# AI翻译（Ollama本地翻译）
+curl -X POST http://localhost:18787/plugins/EbookConverter/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "translate",
+    "input_file": "uploads/book.epub",
+    "target_language": "zh-CN",
+    "translator": "ollama",
+    "model": "qwen:7b",
+    "bilingual": true,
+    "output_format": "txt"
+  }'
+
+# AI翻译（DeepSeek云端翻译）
+curl -X POST http://localhost:18787/plugins/EbookConverter/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "translate",
+    "input_file": "uploads/book.pdf",
+    "target_language": "zh-CN",
+    "translator": "deepseek",
+    "api_key": "your-deepseek-api-key",
+    "bilingual": false,
+    "output_format": "pdf"
+  }'
+```
+
 ## 开发新插件
 
 ### 1. 创建插件文件
@@ -444,17 +523,205 @@ A: 建议：
 - 保持原始分辨率
 - 使用"慢速"编码预设以获得更好质量
 
+## 电子书转换工具详细说明
+
+### 功能特性
+
+1. **格式转换**
+   - 支持格式：PDF、EPUB、MOBI、TXT、AZW3、DOCX
+   - 基于Calibre的ebook-convert引擎，转换质量高
+   - 保留书籍元数据（书名、作者、封面等）
+   - 自动调整排版和格式
+
+2. **OCR文字识别**
+   - 扫描版PDF转可搜索PDF
+   - 支持中英文混合识别（chi_sim + eng）
+   - 基于Tesseract OCR引擎
+   - 使用OCRmyPDF工具，保持原PDF格式
+   - 识别后的PDF可复制、搜索文字
+   - 处理进度显示
+
+3. **AI智能翻译**
+   - **两种翻译引擎**：
+     - Ollama（本地翻译，完全免费，需安装）
+     - DeepSeek（云端翻译，需API密钥）
+   - **支持语言**：简体中文、英语、日语、韩语
+   - **两种输出模式**：
+     - 双语对照：原文和译文段落对照显示
+     - 纯译文：仅输出翻译后的文本
+   - **智能分段**：
+     - 自动将长文本分段翻译（2000字符/段）
+     - 保持段落结构和换行
+     - 进度实时显示
+   - **多格式输出**：支持输出为TXT或PDF格式
+
+4. **依赖检测**
+   - 自动检测Calibre安装状态和版本
+   - 自动检测Tesseract OCR安装状态
+   - 自动检测Ollama服务状态
+   - 列出Ollama可用模型列表
+   - 在Web界面显示依赖安装状态
+
+### 使用流程
+
+#### 格式转换
+1. 打开电子书转换工具页面
+2. 切换到"格式转换"标签
+3. 选择或拖拽电子书文件上传
+4. 选择目标格式（PDF、EPUB、MOBI、TXT、AZW3、DOCX）
+5. 点击"开始转换"
+6. 等待处理完成（通常几秒到几分钟）
+7. 点击下载链接获取转换后的文件
+
+#### OCR识别
+1. 切换到"OCR识别"标签
+2. 上传扫描版PDF文件
+3. 点击"开始OCR识别"
+4. 等待处理完成（时间取决于页数和清晰度）
+5. 下载可搜索的PDF文件
+
+#### AI翻译
+1. 切换到"AI翻译"标签
+2. 上传电子书文件（PDF、EPUB、TXT等）
+3. 选择翻译引擎：
+   - **Ollama（推荐新手）**：
+     - 选择"Ollama（本地翻译）"
+     - 从模型列表中选择（推荐qwen系列）
+     - 完全免费，数据不上传云端
+   - **DeepSeek（推荐快速翻译）**：
+     - 选择"DeepSeek（云端翻译）"
+     - 输入DeepSeek API密钥
+     - 翻译速度快，质量高
+4. 选择目标语言（通常选择"简体中文"）
+5. 选择翻译模式：
+   - 双语对照：原文和译文对照显示（推荐）
+   - 仅翻译文本：只输出译文
+6. 选择输出格式（TXT或PDF）
+7. 点击"开始翻译"
+8. 等待处理完成（长文本可能需要较长时间）
+9. 下载翻译后的文件
+
+### 系统要求
+
+#### 必需依赖
+- **Python 3.7+**
+- **Flask及相关包**（自动安装）
+- **Python包**（运行pip install -r requirements.txt自动安装）：
+  - PyPDF2（PDF处理）
+  - ebooklib（EPUB处理）
+  - beautifulsoup4（HTML解析）
+  - Pillow（图像处理）
+  - requests（HTTP请求）
+
+#### 格式转换依赖
+- **Calibre**（必需）：
+  - Windows: 从[官网](https://calibre-ebook.com/download)下载安装
+  - Linux: `sudo apt install calibre`
+  - macOS: `brew install calibre`
+  - 确保ebook-convert命令在PATH中
+
+#### OCR识别依赖（可选）
+- **Tesseract OCR**：
+  - **详细安装指南**: [TESSERACT_GUIDE.md](TESSERACT_GUIDE.md)
+  - Windows: 从[UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)下载安装
+    - 安装时选择"中文简体"和"English"语言包
+  - Linux: `sudo apt install tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng`
+  - macOS: `brew install tesseract tesseract-lang`
+- **OCRmyPDF**：
+  - 安装: `pip install ocrmypdf`
+
+#### AI翻译依赖（可选）
+- **Ollama**（本地翻译）：
+  - 从[官网](https://ollama.ai/)下载安装
+  - 安装后运行: `ollama pull qwen:7b`（或其他模型）
+  - 推荐模型：qwen:7b、qwen:14b、llama2:13b
+- **DeepSeek API**（云端翻译）：
+  - 注册[DeepSeek账号](https://platform.deepseek.com/)
+  - 获取API密钥
+  - 设置环境变量（可选）：`DEEPSEEK_API_KEY=your-key`
+
+### 常见问题
+
+**Q: 转换失败，提示找不到ebook-convert？**
+A: 请确保：
+- 已正确安装Calibre
+- Calibre的安装路径已添加到系统PATH
+- Windows用户：通常路径为`C:\Program Files\Calibre2\`
+
+**Q: OCR识别失败？**
+A: 检查：
+- 是否已安装Tesseract OCR
+- 是否已安装中文语言包（chi_sim）
+- 是否已安装ocrmypdf：`pip install ocrmypdf`
+- PDF是否为扫描版（如果已是文字版，无需OCR）
+
+**Q: Ollama翻译失败？**
+A: 可能原因：
+- Ollama服务未启动（运行`ollama serve`）
+- 模型未下载（运行`ollama pull qwen:7b`）
+- 模型名称错误（从依赖检测中查看可用模型）
+
+**Q: DeepSeek翻译失败？**
+A: 请确保：
+- API密钥正确
+- 账户余额充足
+- 网络连接正常
+
+**Q: 翻译很慢？**
+A: 这是正常现象：
+- 长文本需要分段翻译
+- Ollama本地翻译速度取决于CPU/GPU性能
+- DeepSeek云端翻译速度取决于网络和API限流
+- 建议：先用短文本测试，长文本耐心等待
+
+**Q: 翻译质量不好？**
+A: 建议：
+- Ollama用户：尝试更大的模型（qwen:14b、llama2:13b）
+- DeepSeek用户：已使用先进模型，质量较高
+- 检查原文是否清晰（OCR识别的文本可能有错误）
+
+**Q: 支持哪些电子书格式？**
+A: 
+- **读取**：PDF、EPUB、MOBI、AZW3、TXT、DOCX
+- **转换输出**：PDF、EPUB、MOBI、TXT、AZW3、DOCX
+- **OCR输入**：仅PDF
+- **翻译输出**：TXT、PDF
+
+**Q: 如何选择翻译引擎？**
+A:
+- **Ollama优势**：完全免费、数据本地处理、不限次数
+- **Ollama劣势**：需要下载模型（几GB）、翻译较慢、需要较好的硬件
+- **DeepSeek优势**：速度快、质量高、无需本地资源
+- **DeepSeek劣势**：需要API密钥、可能有费用、需要网络
+
 ## 配置
 
-在 [config.py](d:\MyCode\Python\miniTools\config.py) 中修改配置：
+在 [config.py](config.py) 中修改配置：
 
+### 基础配置
 ```python
 HOST = '0.0.0.0'      # 服务监听地址
 PORT = 18787          # 服务端口
 PLUGIN_DIR = 'plugins' # 插件目录
 ```
 
-在 [api_server.py](d:\MyCode\Python\miniTools\frontend\api_server.py) 中修改：
+### 电子书转换工具配置
+```python
+# Ollama配置
+OLLAMA_BASE_URL = 'http://localhost:11434'  # Ollama服务地址
+OLLAMA_API_TIMEOUT = 120  # API请求超时时间（秒）
+
+# DeepSeek配置
+DEEPSEEK_API_KEY = ''  # DeepSeek API密钥
+DEEPSEEK_BASE_URL = 'https://api.deepseek.com/v1'  # DeepSeek API地址
+DEEPSEEK_API_TIMEOUT = 120  # API请求超时时间（秒）
+```
+
+详细配置说明请参考: [EBOOK_CONFIG.md](EBOOK_CONFIG.md)
+
+### 文件上传限制
+
+在 [api_server.py](frontend/api_server.py) 中修改：
 
 ```python
 MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 最大上传2GB
@@ -516,6 +783,16 @@ MIT License
 
 ## 更新日志
 
+### v1.4.0 (2025-12-31)
+- 📚 新增电子书转换与翻译工具（EbookConverter）
+- 🔄 格式转换：支持PDF、EPUB、MOBI、TXT、AZW3、DOCX互转
+- 👁️ OCR识别：扫描版PDF文字识别，支持中英文混合
+- 🤖 AI翻译：集成Ollama和DeepSeek，支持双语对照模式
+- 📖 双语对照：原文和译文段落对照显示
+- 🌍 多语言支持：简体中文、英语、日语、韩语
+- ⚙️ 依赖检测：自动检测Calibre、Tesseract、Ollama状态
+- 🎨 三标签页界面：格式转换、OCR识别、AI翻译独立操作
+
 ### v1.3.0 (2025-12-28)
 - 🎮 优化显卡信息显示，支持显示NVIDIA显卡型号和显存容量
 - 📊 改进GPU状态展示，只显示主力显卡的详细信息
@@ -544,6 +821,6 @@ MIT License
 
 ### v1.0.0 (2025-12-28)
 - 🎉 初始版本发布
-- ✅ 实现6个核心插件
+- ✅ 实现6个核心插件（Calculator、TextTool、SystemInfo、TokenGenerator、JsonFormatter、VideoCompressor）
 - 🌐 完整的Web界面支持
 - 🚀 GPU加速视频压缩功能

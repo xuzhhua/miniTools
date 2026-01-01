@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电子书转换与翻译 - MiniTools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #e0e0e0;
+            color: #333;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #d0d0d0;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .deps-status {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .deps-status h3 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .dep-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #e0e0e0;
+        }
+        
+        .dep-item.installed {
+            border-left-color: #28a745;
+        }
+        
+        .dep-item.not-installed {
+            border-left-color: #dc3545;
+        }
+        
+        .dep-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .dep-status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .dep-status-badge.installed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .dep-status-badge.not-installed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            background: #f0f2ff;
+            border-color: #5568d3;
+        }
+        
+        .upload-area.drag-over {
+            background: #e7eaff;
+            border-color: #4450b5;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        .upload-text {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .upload-hint {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .file-info.show {
+            display: block;
+        }
+        
+        .file-info h3 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .control-group.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        select {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #5a6268;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover:not(:disabled) {
+            background: #218838;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        input:disabled, select:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #f5f5f5;
+        }
+        
+        .progress {
+            background: #e0e0e0;
+            height: 40px;
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .progress.show {
+            display: block;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .result h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .result.success h3 {
+            color: #155724;
+        }
+        
+        .result.error h3 {
+            color: #721c24;
+        }
+        
+        .download-link {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        
+        .download-link:hover {
+            background: #5568d3;
+        }
+        
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .warning-box h4 {
+            color: #856404;
+            margin-bottom: 8px;
+        }
+        
+        .warning-box p {
+            color: #856404;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">← 返回主页</a>
+        
+        <h1>📚 电子书转换与翻译</h1>
+        <p class="subtitle">支持格式转换、OCR识别、AI翻译</p>
+        
+        <!-- 依赖状态 -->
+        <div class="deps-status" id="deps-status">
+            <h3>🔧 依赖工具状态</h3>
+            <div id="deps-list">
+                <div style="text-align: center; color: #999;">正在检测...</div>
+            </div>
+        </div>
+        
+        <!-- 标签页 -->
+        <div class="tabs">
+            <button class="tab active" data-tab="convert">格式转换</button>
+            <button class="tab" data-tab="ocr">OCR识别</button>
+            <button class="tab" data-tab="translate">AI翻译</button>
+        </div>
+        
+        <!-- 格式转换标签 -->
+        <div id="convert-tab" class="tab-content active">
+            <div class="upload-area" id="upload-area-convert">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">点击选择或拖拽电子书文件到此处</div>
+                <div class="upload-hint">支持 PDF, EPUB, MOBI, TXT, AZW3, DOCX 等格式</div>
+                <input type="file" id="file-input-convert" class="file-input" accept=".pdf,.epub,.mobi,.txt,.azw3,.docx">
+            </div>
+            
+            <div class="file-info" id="file-info-convert">
+                <h3>📊 文件信息</h3>
+                <div class="info-grid" id="info-grid-convert"></div>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="output-format-convert">输出格式</label>
+                    <select id="output-format-convert">
+                        <option value="epub">EPUB</option>
+                        <option value="pdf">PDF</option>
+                        <option value="mobi">MOBI</option>
+                        <option value="txt">TXT</option>
+                        <option value="azw3">AZW3</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="output-filename-convert">输出文件名</label>
+                    <input type="text" id="output-filename-convert" placeholder="converted_book.epub">
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="btn-convert" disabled>🔄 开始转换</button>
+            </div>
+            
+            <div class="progress" id="progress-convert">
+                <div class="progress-fill" id="progress-fill-convert">0%</div>
+            </div>
+            <div class="progress-text" id="progress-text-convert"></div>
+            
+            <div class="result" id="result-convert"></div>
+        </div>
+        
+        <!-- OCR识别标签 -->
+        <div id="ocr-tab" class="tab-content">
+            <div class="warning-box">
+                <h4>⚠️ OCR功能说明</h4>
+                <p>• 此功能用于识别扫描版PDF中的文字</p>
+                <p>• 需要安装Tesseract OCR和OCRmyPDF工具</p>
+                <p>• 处理时间较长，请耐心等待</p>
+            </div>
+            
+            <div class="upload-area" id="upload-area-ocr">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">点击选择或拖拽PDF文件到此处</div>
+                <div class="upload-hint">仅支持 PDF 格式</div>
+                <input type="file" id="file-input-ocr" class="file-input" accept=".pdf">
+            </div>
+            
+            <div class="file-info" id="file-info-ocr">
+                <h3>📊 文件信息</h3>
+                <div class="info-grid" id="info-grid-ocr"></div>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="output-format-ocr">输出格式</label>
+                    <select id="output-format-ocr">
+                        <option value="pdf">PDF</option>
+                        <option value="epub">EPUB</option>
+                        <option value="txt">TXT</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="output-filename-ocr">输出文件名</label>
+                    <input type="text" id="output-filename-ocr" placeholder="ocr_book.pdf">
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="btn-ocr" disabled>🔍 开始OCR识别</button>
+            </div>
+            
+            <div class="progress" id="progress-ocr">
+                <div class="progress-fill" id="progress-fill-ocr">0%</div>
+            </div>
+            <div class="progress-text" id="progress-text-ocr"></div>
+            
+            <div class="result" id="result-ocr"></div>
+        </div>
+        
+        <!-- AI翻译标签 -->
+        <div id="translate-tab" class="tab-content">
+            <div class="warning-box">
+                <h4>⚠️ 翻译功能说明</h4>
+                <p>• 支持使用Ollama或DeepSeek进行翻译</p>
+                <p>• 翻译较长内容需要较多时间</p>
+                <p>• 建议先测试较短的文档</p>
+                <p>• DeepSeek需要设置DEEPSEEK_API_KEY环境变量</p>
+            </div>
+            
+            <div class="upload-area" id="upload-area-translate">
+                <div class="upload-icon">🌐</div>
+                <div class="upload-text">点击选择或拖拽电子书文件到此处</div>
+                <div class="upload-hint">支持 PDF, EPUB, TXT 等格式</div>
+                <input type="file" id="file-input-translate" class="file-input" accept=".pdf,.epub,.txt,.mobi">
+            </div>
+            
+            <div class="file-info" id="file-info-translate">
+                <h3>📊 文件信息</h3>
+                <div class="info-grid" id="info-grid-translate"></div>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="translate-provider">翻译服务</label>
+                    <select id="translate-provider">
+                        <option value="ollama">Ollama</option>
+                        <option value="deepseek">DeepSeek</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="translate-model">模型</label>
+                    <select id="translate-model">
+                        <option value="qwen2.5:7b">Qwen2.5 7B</option>
+                        <option value="qwen2.5:14b">Qwen2.5 14B</option>
+                        <option value="deepseek-chat">DeepSeek Chat</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="target-language">目标语言</label>
+                    <select id="target-language">
+                        <option value="zh-CN">简体中文</option>
+                        <option value="en">English</option>
+                        <option value="ja">日本語</option>
+                        <option value="ko">한국어</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="output-format-translate">输出格式</label>
+                    <select id="output-format-translate">
+                        <option value="epub">EPUB</option>
+                        <option value="pdf">PDF</option>
+                        <option value="txt">TXT</option>
+                    </select>
+                </div>
+                
+                <div class="control-group full-width">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="bilingual" checked>
+                        <label for="bilingual" style="margin: 0;">生成双语对照版本</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="btn-translate" disabled>🌐 开始翻译</button>
+            </div>
+            
+            <div class="progress" id="progress-translate">
+                <div class="progress-fill" id="progress-fill-translate">0%</div>
+            </div>
+            <div class="progress-text" id="progress-text-translate"></div>
+            
+            <div class="result" id="result-translate"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE_URL = `${window.location.protocol}//${window.location.host}`;
+        let uploadedFiles = {
+            convert: null,
+            ocr: null,
+            translate: null
+        };
+        
+        // 全局变量：存储可用的Ollama模型
+        let availableOllamaModels = [];
+        
+        // 处理状态标志
+        let isConverting = false;
+        let isOCRProcessing = false;
+        let isTranslating = false;
+        
+        // 防止用户离开页面
+        window.addEventListener('beforeunload', (e) => {
+            if (isConverting || isOCRProcessing || isTranslating) {
+                e.preventDefault();
+                e.returnValue = '正在处理中，确定要离开吗？';
+                return '正在处理中，确定要离开吗？';
+            }
+        });
+        
+        // 标签页切换
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabName = this.dataset.tab;
+                
+                // 切换标签激活状态
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // 切换内容显示
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+            });
+        });
+        
+        // 检查依赖工具
+        async function checkDependencies() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins/EbookConverter/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'check_dependencies'
+                    })
+                });
+                
+                const result = await response.json();
+                displayDependencies(result.dependencies);
+                
+                // 保存Ollama模型列表
+                if (result.dependencies && result.dependencies.ollama && result.dependencies.ollama.models) {
+                    availableOllamaModels = result.dependencies.ollama.models;
+                }
+            } catch (error) {
+                document.getElementById('deps-list').innerHTML = 
+                    '<div style="color: #dc3545;">检测失败: ' + error.message + '</div>';
+            }
+        }
+        
+        // 显示依赖状态
+        function displayDependencies(deps) {
+            const depsList = document.getElementById('deps-list');
+            let html = '';
+            
+            const depNames = {
+                'calibre': 'Calibre (ebook-convert)',
+                'tesseract': 'Tesseract OCR',
+                'ollama': 'Ollama'
+            };
+            
+            for (const [key, info] of Object.entries(deps)) {
+                const isInstalled = info.installed || info.available;
+                const statusClass = isInstalled ? 'installed' : 'not-installed';
+                const statusText = isInstalled ? '已安装' : '未安装';
+                
+                html += `
+                    <div class="dep-item ${statusClass}">
+                        <div>
+                            <span class="dep-name">${depNames[key] || key}</span>
+                            ${info.version ? `<div style="font-size: 12px; color: #666;">${info.version}</div>` : ''}
+                            ${key === 'ollama' && info.models && info.models.length > 0 ? `<div style="font-size: 12px; color: #666;">可用模型数: ${info.models.length}个</div>` : ''}
+                        </div>
+                        <span class="dep-status-badge ${statusClass}">${statusText}</span>
+                    </div>
+                `;
+            }
+            
+            depsList.innerHTML = html;
+        }
+        
+        // 设置文件上传功能
+        function setupFileUpload(tabName) {
+            const uploadArea = document.getElementById(`upload-area-${tabName}`);
+            const fileInput = document.getElementById(`file-input-${tabName}`);
+            
+            uploadArea.addEventListener('click', () => fileInput.click());
+            
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('drag-over');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('drag-over');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileSelect(tabName, files[0]);
+                }
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileSelect(tabName, e.target.files[0]);
+                }
+            });
+        }
+        
+        // 处理文件选择
+        async function handleFileSelect(tabName, file) {
+            // 显示上传进度
+            const progressDiv = document.getElementById(`progress-${tabName}`);
+            const progressFill = document.getElementById(`progress-fill-${tabName}`);
+            const progressText = document.getElementById(`progress-text-${tabName}`);
+            
+            progressDiv.classList.add('show');
+            progressText.textContent = '正在上传文件...';
+            progressFill.style.width = '0%';
+            progressFill.textContent = '0%';
+            
+            try {
+                // 上传文件
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch(`${API_BASE_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.status === 413) {
+                    throw new Error('文件太大，最大支持2GB');
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    uploadedFiles[tabName] = result.filepath;
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    progressText.textContent = '上传完成';
+                    
+                    // 自动设置输出文件名（使用原始文件名）
+                    const fileName = file.name;
+                    const fileNameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+                    const outputFilenameInput = document.getElementById(`output-filename-${tabName}`);
+                    if (outputFilenameInput && !outputFilenameInput.value) {
+                        const outputFormat = document.getElementById(`output-format-${tabName}`).value;
+                        outputFilenameInput.value = `${fileNameWithoutExt}.${outputFormat}`;
+                    }
+                    
+                    // 显示文件信息
+                    await displayFileInfo(tabName, result.filepath);
+                    
+                    // 启用操作按钮
+                    document.getElementById(`btn-${tabName}`).disabled = false;
+                    
+                    setTimeout(() => {
+                        progressDiv.classList.remove('show');
+                    }, 1000);
+                } else {
+                    throw new Error(result.message || '上传失败');
+                }
+            } catch (error) {
+                progressText.textContent = '上传失败: ' + error.message;
+                progressFill.style.background = '#dc3545';
+            }
+        }
+        
+        // 显示文件信息
+        async function displayFileInfo(tabName, filepath) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins/EbookConverter/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'info',
+                        input_file: filepath
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.info) {
+                    const info = result.info;
+                    const fileInfo = document.getElementById(`file-info-${tabName}`);
+                    const infoGrid = document.getElementById(`info-grid-${tabName}`);
+                    
+                    let html = `
+                        <div class="info-item">
+                            <div class="info-label">文件名</div>
+                            <div class="info-value">${info.filename}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">格式</div>
+                            <div class="info-value">${info.format.toUpperCase()}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">大小</div>
+                            <div class="info-value">${info.size}</div>
+                        </div>
+                    `;
+                    
+                    if (info.title) {
+                        html += `
+                            <div class="info-item">
+                                <div class="info-label">标题</div>
+                                <div class="info-value">${info.title}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (info.author) {
+                        html += `
+                            <div class="info-item">
+                                <div class="info-label">作者</div>
+                                <div class="info-value">${info.author}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (info.pages) {
+                        html += `
+                            <div class="info-item">
+                                <div class="info-label">页数</div>
+                                <div class="info-value">${info.pages}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (info.language) {
+                        html += `
+                            <div class="info-item">
+                                <div class="info-label">语言</div>
+                                <div class="info-value">${info.language}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    infoGrid.innerHTML = html;
+                    fileInfo.classList.add('show');
+                }
+            } catch (error) {
+                console.error('获取文件信息失败:', error);
+            }
+        }
+        
+        // 禁用/启用格式转换控件
+        function disableConvertControls() {
+            document.getElementById('btn-convert').disabled = true;
+            document.getElementById('file-input-convert').disabled = true;
+            document.getElementById('output-format-convert').disabled = true;
+            document.getElementById('output-filename-convert').disabled = true;
+            
+            // 同时禁用其他标签页的控件
+            disableOCRControls();
+            disableTranslateControlsOnly();
+        }
+        
+        function enableConvertControls() {
+            document.getElementById('btn-convert').disabled = false;
+            document.getElementById('file-input-convert').disabled = false;
+            document.getElementById('output-format-convert').disabled = false;
+            document.getElementById('output-filename-convert').disabled = false;
+            
+            // 同时启用其他标签页的控件
+            enableOCRControls();
+            enableTranslateControlsOnly();
+        }
+        
+        // 禁用/启用OCR控件
+        function disableOCRControls() {
+            document.getElementById('btn-ocr').disabled = true;
+            document.getElementById('file-input-ocr').disabled = true;
+            document.getElementById('output-format-ocr').disabled = true;
+            document.getElementById('output-filename-ocr').disabled = true;
+            
+            // 同时禁用其他标签页的控件
+            disableConvertControlsOnly();
+            disableTranslateControlsOnly();
+        }
+        
+        function enableOCRControls() {
+            document.getElementById('btn-ocr').disabled = false;
+            document.getElementById('file-input-ocr').disabled = false;
+            document.getElementById('output-format-ocr').disabled = false;
+            document.getElementById('output-filename-ocr').disabled = false;
+            
+            // 同时启用其他标签页的控件
+            enableConvertControlsOnly();
+            enableTranslateControlsOnly();
+        }
+        
+        // 只禁用/启用本标签页（避免循环调用）
+        function disableConvertControlsOnly() {
+            document.getElementById('btn-convert').disabled = true;
+            document.getElementById('file-input-convert').disabled = true;
+            document.getElementById('output-format-convert').disabled = true;
+            document.getElementById('output-filename-convert').disabled = true;
+        }
+        
+        function enableConvertControlsOnly() {
+            document.getElementById('btn-convert').disabled = false;
+            document.getElementById('file-input-convert').disabled = false;
+            document.getElementById('output-format-convert').disabled = false;
+            document.getElementById('output-filename-convert').disabled = false;
+        }
+        
+        function disableOCRControlsOnly() {
+            document.getElementById('btn-ocr').disabled = true;
+            document.getElementById('file-input-ocr').disabled = true;
+            document.getElementById('output-format-ocr').disabled = true;
+            document.getElementById('output-filename-ocr').disabled = true;
+        }
+        
+        function enableOCRControlsOnly() {
+            document.getElementById('btn-ocr').disabled = false;
+            document.getElementById('file-input-ocr').disabled = false;
+            document.getElementById('output-format-ocr').disabled = false;
+            document.getElementById('output-filename-ocr').disabled = false;
+        }
+        
+        function disableTranslateControlsOnly() {
+            document.getElementById('btn-translate').disabled = true;
+            document.getElementById('file-input-translate').disabled = true;
+            document.getElementById('translate-provider').disabled = true;
+            document.getElementById('translate-model').disabled = true;
+            document.getElementById('target-language').disabled = true;
+            document.getElementById('output-format-translate').disabled = true;
+            document.getElementById('bilingual').disabled = true;
+        }
+        
+        function enableTranslateControlsOnly() {
+            document.getElementById('btn-translate').disabled = false;
+            document.getElementById('file-input-translate').disabled = false;
+            document.getElementById('translate-provider').disabled = false;
+            document.getElementById('translate-model').disabled = false;
+            document.getElementById('target-language').disabled = false;
+            document.getElementById('output-format-translate').disabled = false;
+            document.getElementById('bilingual').disabled = false;
+        }
+        
+        // 禁用/启用翻译控件
+        function disableTranslateControls() {
+            document.getElementById('btn-translate').disabled = true;
+            document.getElementById('file-input-translate').disabled = true;
+            document.getElementById('translate-provider').disabled = true;
+            document.getElementById('translate-model').disabled = true;
+            document.getElementById('target-language').disabled = true;
+            document.getElementById('output-format-translate').disabled = true;
+            document.getElementById('bilingual').disabled = true;
+            
+            // 同时禁用其他标签页的控件
+            disableConvertControlsOnly();
+            disableOCRControlsOnly();
+        }
+        
+        function enableTranslateControls() {
+            document.getElementById('btn-translate').disabled = false;
+            document.getElementById('file-input-translate').disabled = false;
+            document.getElementById('translate-provider').disabled = false;
+            document.getElementById('translate-model').disabled = false;
+            document.getElementById('target-language').disabled = false;
+            document.getElementById('output-format-translate').disabled = false;
+            document.getElementById('bilingual').disabled = false;
+            
+            // 同时启用其他标签页的控件
+            enableConvertControlsOnly();
+            enableOCRControlsOnly();
+        }
+        
+        // 格式转换
+        async function convertFormat() {
+            const outputFormat = document.getElementById('output-format-convert').value;
+            const outputFilename = document.getElementById('output-filename-convert').value || `converted.${outputFormat}`;
+            
+            const progressDiv = document.getElementById('progress-convert');
+            const progressFill = document.getElementById('progress-fill-convert');
+            const progressText = document.getElementById('progress-text-convert');
+            const resultDiv = document.getElementById('result-convert');
+            
+            // 设置处理状态并禁用所有控件
+            isConverting = true;
+            disableConvertControls();
+            
+            progressDiv.classList.add('show');
+            progressText.textContent = '正在转换格式...';
+            resultDiv.classList.remove('show');
+            
+            // 动态进度更新
+            let progress = 10;
+            progressFill.style.width = progress + '%';
+            progressFill.textContent = progress + '%';
+            
+            const progressInterval = setInterval(() => {
+                if (progress < 90) {
+                    progress += 5;
+                    progressFill.style.width = progress + '%';
+                    progressFill.textContent = progress + '%';
+                }
+            }, 500);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins/EbookConverter/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'convert',
+                        input_file: uploadedFiles.convert,
+                        output_format: outputFormat,
+                        output_file: outputFilename
+                    })
+                });
+                
+                const result = await response.json();
+                
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+                progressFill.textContent = '100%';
+                
+                if (result.success) {
+                    resultDiv.className = 'result success show';
+                    resultDiv.innerHTML = `
+                        <h3>✓ 转换成功</h3>
+                        <p>文件已保存</p>
+                        <a href="${API_BASE_URL}/download/${result.output_file}" class="download-link">📥 下载文件</a>
+                    `;
+                } else {
+                    resultDiv.className = 'result error show';
+                    resultDiv.innerHTML = `
+                        <h3>✗ 转换失败</h3>
+                        <p>${result.error}</p>
+                    `;
+                }
+            } catch (error) {
+                clearInterval(progressInterval);
+                resultDiv.className = 'result error show';
+                resultDiv.innerHTML = `
+                    <h3>✗ 转换失败</h3>
+                    <p>${error.message}</p>
+                `;
+            } finally {
+                // 恢复所有控件
+                isConverting = false;
+                enableConvertControls();
+            }
+        }
+        
+        // OCR处理
+        async function processOCR() {
+            const outputFormat = document.getElementById('output-format-ocr').value;
+            const outputFilename = document.getElementById('output-filename-ocr').value || `ocr.${outputFormat}`;
+            
+            const progressDiv = document.getElementById('progress-ocr');
+            const progressFill = document.getElementById('progress-fill-ocr');
+            const progressText = document.getElementById('progress-text-ocr');
+            const resultDiv = document.getElementById('result-ocr');
+            
+            // 设置处理状态并禁用所有控件
+            isOCRProcessing = true;
+            disableOCRControls();
+            
+            progressDiv.classList.add('show');
+            progressText.textContent = '正在进行OCR识别...（这可能需要几分钟）';
+            resultDiv.classList.remove('show');
+            
+            // 动态进度更新（OCR较慢，进度更新缓慢）
+            let progress = 5;
+            progressFill.style.width = progress + '%';
+            progressFill.textContent = progress + '%';
+            
+            const progressInterval = setInterval(() => {
+                if (progress < 85) {
+                    progress += 3;
+                    progressFill.style.width = progress + '%';
+                    progressFill.textContent = progress + '%';
+                }
+            }, 1000);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins/EbookConverter/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'ocr',
+                        input_file: uploadedFiles.ocr,
+                        output_format: outputFormat,
+                        output_file: outputFilename
+                    })
+                });
+                
+                const result = await response.json();
+                
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+                progressFill.textContent = '100%';
+                
+                if (result.success) {
+                    resultDiv.className = 'result success show';
+                    resultDiv.innerHTML = `
+                        <h3>✓ OCR识别成功</h3>
+                        <p>文件已保存</p>
+                        <a href="${API_BASE_URL}/download/${result.output_file}" class="download-link">📥 下载文件</a>
+                    `;
+                } else {
+                    resultDiv.className = 'result error show';
+                    resultDiv.innerHTML = `
+                        <h3>✗ OCR识别失败</h3>
+                        <p>${result.error}</p>
+                    `;
+                }
+            } catch (error) {
+                clearInterval(progressInterval);
+                resultDiv.className = 'result error show';
+                resultDiv.innerHTML = `
+                    <h3>✗ OCR识别失败</h3>
+                    <p>${error.message}</p>
+                `;
+            } finally {
+                // 恢复所有控件
+                isOCRProcessing = false;
+                enableOCRControls();
+            }
+        }
+        
+        // AI翻译
+        async function translateEbook() {
+            const provider = document.getElementById('translate-provider').value;
+            const model = document.getElementById('translate-model').value;
+            const targetLanguage = document.getElementById('target-language').value;
+            const outputFormat = document.getElementById('output-format-translate').value;
+            const bilingual = document.getElementById('bilingual').checked;
+            
+            const progressDiv = document.getElementById('progress-translate');
+            const progressFill = document.getElementById('progress-fill-translate');
+            const progressText = document.getElementById('progress-text-translate');
+            const resultDiv = document.getElementById('result-translate');
+            
+            // 设置处理状态并禁用所有控件
+            isTranslating = true;
+            disableTranslateControls();
+            
+            progressDiv.classList.add('show');
+            progressText.textContent = '正在翻译...（这可能需要较长时间）';
+            resultDiv.classList.remove('show');
+            
+            // 初始进度
+            let progress = 5;
+            progressFill.style.width = progress + '%';
+            progressFill.textContent = progress + '%';
+            
+            // 获取文件名用于进度查询
+            const filePath = uploadedFiles.translate || '';
+            const fileName = filePath.replace(/\\/g, '/').split('/').pop();
+            
+            console.log('Translation file name for progress:', fileName);
+            
+            // 启动进度轮询
+            const progressInterval = setInterval(async () => {
+                if (!isTranslating) {
+                    clearInterval(progressInterval);
+                    return;
+                }
+                
+                try {
+                    const progressResponse = await fetch(`${API_BASE_URL}/plugins/EbookConverter/execute`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            action: 'get_progress',
+                            file_name: fileName
+                        })
+                    });
+                    
+                    const progressData = await progressResponse.json();
+                    
+                    if (progressData.success && progressData.progress) {
+                        const { current, total, status } = progressData.progress;
+                        
+                        console.log(`Progress update: ${current}/${total}, status: ${status}`);
+                        
+                        if (total > 0) {
+                            // 根据实际进度计算百分比（保留5%-95%区间）
+                            const realProgress = Math.floor((current / total) * 90) + 5;
+                            progressFill.style.width = realProgress + '%';
+                            progressFill.textContent = realProgress + '%';
+                            progressText.textContent = `正在翻译... (${current}/${total} 段落)`;
+                        }
+                    } else {
+                        console.log('Progress response:', progressData);
+                    }
+                } catch (error) {
+                    console.error('获取翻译进度失败:', error);
+                }
+            }, 2000); // 每2秒查询一次
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/plugins/EbookConverter/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'translate',
+                        input_file: uploadedFiles.translate,
+                        translate_provider: provider,
+                        translate_model: model,
+                        target_language: targetLanguage,
+                        output_format: outputFormat,
+                        bilingual: bilingual
+                    })
+                });
+                
+                const result = await response.json();
+                
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+                progressFill.textContent = '100%';
+                progressText.textContent = '翻译完成';
+                
+                if (result.success) {
+                    resultDiv.className = 'result success show';
+                    resultDiv.innerHTML = `
+                        <h3>✓ 翻译成功</h3>
+                        <p>文件已保存</p>
+                        <a href="${API_BASE_URL}/download/${result.output_file}" class="download-link">📥 下载文件</a>
+                    `;
+                } else {
+                    resultDiv.className = 'result error show';
+                    resultDiv.innerHTML = `
+                        <h3>✗ 翻译失败</h3>
+                        <p>${result.error}</p>
+                    `;
+                }
+            } catch (error) {
+                clearInterval(progressInterval);
+                resultDiv.className = 'result error show';
+                resultDiv.innerHTML = `
+                    <h3>✗ 翻译失败</h3>
+                    <p>${error.message}</p>
+                `;
+            } finally {
+                // 恢复所有控件
+                isTranslating = false;
+                enableTranslateControls();
+            }
+        }
+        
+        // 更新模型列表
+        function updateModelList(provider) {
+            const modelSelect = document.getElementById('translate-model');
+            modelSelect.innerHTML = ''; // 清空现有选项
+            
+            if (provider === 'ollama') {
+                // 使用实际可用的Ollama模型
+                if (availableOllamaModels.length > 0) {
+                    availableOllamaModels.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        modelSelect.appendChild(option);
+                    });
+                } else {
+                    // 如果没有检测到模型，显示默认选项
+                    const defaultModels = ['qwen2.5:7b', 'qwen2.5:14b', 'llama2:13b'];
+                    defaultModels.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        modelSelect.appendChild(option);
+                    });
+                }
+            } else if (provider === 'deepseek') {
+                // DeepSeek只有一个模型
+                const option = document.createElement('option');
+                option.value = 'deepseek-chat';
+                option.textContent = 'DeepSeek Chat';
+                modelSelect.appendChild(option);
+            }
+        }
+        
+        // 绑定按钮事件
+        document.getElementById('btn-convert').addEventListener('click', convertFormat);
+        document.getElementById('btn-ocr').addEventListener('click', processOCR);
+        document.getElementById('btn-translate').addEventListener('click', translateEbook);
+        
+        // 绑定翻译服务切换事件
+        document.getElementById('translate-provider').addEventListener('change', (e) => {
+            updateModelList(e.target.value);
+        });
+        
+        // 绑定格式切换事件，自动更新输出文件扩展名
+        ['convert', 'ocr', 'translate'].forEach(tabName => {
+            const formatSelect = document.getElementById(`output-format-${tabName}`);
+            const filenameInput = document.getElementById(`output-filename-${tabName}`);
+            
+            if (formatSelect && filenameInput) {
+                formatSelect.addEventListener('change', () => {
+                    const currentFilename = filenameInput.value;
+                    if (currentFilename) {
+                        // 提取文件名（不含扩展名）
+                        const lastDotIndex = currentFilename.lastIndexOf('.');
+                        const nameWithoutExt = lastDotIndex > 0 ? currentFilename.substring(0, lastDotIndex) : currentFilename;
+                        // 设置新的文件名（新扩展名）
+                        filenameInput.value = `${nameWithoutExt}.${formatSelect.value}`;
+                    }
+                });
+            }
+        });
+        
+        // 初始化
+        window.addEventListener('load', () => {
+            checkDependencies();
+            setupFileUpload('convert');
+            setupFileUpload('ocr');
+            setupFileUpload('translate');
+            
+            // 延迟一下，等待依赖检测完成后更新模型列表
+            setTimeout(() => {
+                const provider = document.getElementById('translate-provider').value;
+                updateModelList(provider);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

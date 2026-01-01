@@ -213,6 +213,26 @@ class APIServer:
                     "message": f"页面加载失败: {str(e)}"
                 }), 500
         
+        @self.app.route('/ui/ebook', methods=['GET'])
+        def ebook_converter_ui():
+            """电子书转换工具Web界面"""
+            try:
+                html_path = os.path.join(self.static_folder, 'ebook_converter.html')
+                
+                if not os.path.exists(html_path):
+                    return jsonify({
+                        "success": False,
+                        "message": f"文件不存在: {html_path}"
+                    }), 404
+                
+                return send_file(html_path)
+            except Exception as e:
+                logger.error(f"加载电子书转换工具界面失败: {str(e)}")
+                return jsonify({
+                    "success": False,
+                    "message": f"页面加载失败: {str(e)}"
+                }), 500
+        
         @self.app.route('/plugins', methods=['GET'])
         def list_plugins():
             """获取所有插件列表"""

@@ -262,8 +262,14 @@
             color: white;
         }
         
-        .clear-btn:hover {
+        .clear-btn:hover:not(:disabled) {
             background: #5a6268;
+        }
+        
+        .clear-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.6;
         }
         
         .progress {
@@ -414,7 +420,7 @@
         <div class="controls">
             <div class="control-group full-width">
                 <label for="output-filename">输出文件名</label>
-                <input type="text" id="output-filename" placeholder="compressed_video.mp4" value="compressed_video.mp4">
+                <input type="text" id="output-filename" placeholder="video_compressed.mp4" value="video_compressed.mp4">
             </div>
             
             <div class="control-group">
@@ -517,6 +523,16 @@
         let uploadedFilePath = null;
         let selectedFile = null;
         let videoMetadata = null; // 存储视频元数据
+        let isCompressing = false; // 标记是否正在压缩
+        
+        // 阻止用户离开页面（当正在压缩时）
+        window.addEventListener('beforeunload', (e) => {
+            if (isCompressing) {
+                e.preventDefault();
+                e.returnValue = '视频正在压缩中，确定要离开吗？未完成的操作将被中断。';
+                return e.returnValue;
+            }
+        });
         
         // 页面加载时检测GPU
         window.addEventListener('DOMContentLoaded', checkGPU);
@@ -663,6 +679,21 @@
                     uploadedFilePath = result.filepath;
                     progressFill.style.width = '100%';
                     progressFill.textContent = '100%';
+                    progressText.textContent = '上传完成';
+                    
+                    // 自动设置输出文件名为原文件名_compressed
+                    const outputFilenameInput = document.getElementById('output-filename');
+                    if (file.name) {
+                        // 分离文件名和扩展名
+                        const lastDotIndex = file.name.lastIndexOf('.');
+                        if (lastDotIndex > 0) {
+                            const baseName = file.name.substring(0, lastDotIndex);
+                            const extension = file.name.substring(lastDotIndex);
+                            outputFilenameInput.value = `${baseName}_compressed${extension}`;
+                        } else {
+                            outputFilenameInput.value = file.name + '_compressed';
+                        }
+                    }
                     
                     // 显示文件信息
                     await displayFileInfo(result);
@@ -671,7 +702,11 @@
                     await getVideoInfo(result.filepath);
                     
                     document.getElementById('compress-btn').disabled = false;
-                    progress.style.display = 'none';
+                    
+                    // 延迟隐藏进度条，让用户看到“上传完成”提示
+                    setTimeout(() => {
+                        progress.style.display = 'none';
+                    }, 1000);
                     
                     showMessage('文件上传成功，请配置压缩参数', 'success');
                 } else {
@@ -831,6 +866,19 @@
         document.getElementById('preset').addEventListener('change', updateEstimate);
         document.getElementById('encoder').addEventListener('change', updateEstimate);
         
+        // 恢复所有控件状态
+        function enableAllControls() {
+            isCompressing = false;
+            document.getElementById('compress-btn').disabled = false;
+            document.getElementById('clear-btn').disabled = false;
+            document.getElementById('file-input').disabled = false;
+            document.getElementById('output-filename').disabled = false;
+            document.getElementById('encoder').disabled = false;
+            document.getElementById('quality').disabled = false;
+            document.getElementById('resolution').disabled = false;
+            document.getElementById('preset').disabled = false;
+        }
+        
         // 开始压缩
         document.getElementById('compress-btn').addEventListener('click', compressVideo);
         
@@ -840,13 +888,26 @@
                 return;
             }
             
-            const outputFilename = document.getElementById('output-filename').value || 'compressed_video.mp4';
+            const outputFilename = document.getElementById('output-filename').value || 'video_compressed.mp4';
             
             // 验证输出文件名
             if (!outputFilename.match(/\.(mp4|avi|mkv|mov)$/i)) {
                 showMessage('输出文件名必须包含视频格式后缀（如 .mp4）', 'error');
                 return;
             }
+            
+            // 设置压缩状态
+            isCompressing = true;
+            
+            // 禁用所有按钮和输入控件
+            document.getElementById('compress-btn').disabled = true;
+            document.getElementById('clear-btn').disabled = true;
+            document.getElementById('file-input').disabled = true;
+            document.getElementById('output-filename').disabled = true;
+            document.getElementById('encoder').disabled = true;
+            document.getElementById('quality').disabled = true;
+            document.getElementById('resolution').disabled = true;
+            document.getElementById('preset').disabled = true;
             
             const progress = document.getElementById('progress');
             const progressFill = document.getElementById('progress-fill');
@@ -856,8 +917,6 @@
             progressText.textContent = '正在压缩视频，请耐心等待...';
             progressFill.style.width = '50%';
             progressFill.textContent = '处理中...';
-            
-            document.getElementById('compress-btn').disabled = true;
             
             // 将质量选项映射到码率
             const qualityToBitrate = {
@@ -895,19 +954,24 @@
                 progressFill.textContent = '100%';
                 
                 if (result.success) {
+                    progressText.textContent = '压缩完成';
                     displayResult(result.result, outputFilename);
                     setTimeout(() => {
                         progress.style.display = 'none';
-                    }, 1000);
+                        // 恢复按钮状态（压缩成功）
+                        enableAllControls();
+                    }, 1500);
                 } else {
                     progress.style.display = 'none';
                     showMessage('压缩失败: ' + (result.error || result.message), 'error');
-                    document.getElementById('compress-btn').disabled = false;
+                    // 恢复按钮状态（压缩失败）
+                    enableAllControls();
                 }
             } catch (error) {
                 progress.style.display = 'none';
                 showMessage('压缩过程出错: ' + error.message, 'error');
-                document.getElementById('compress-btn').disabled = false;
+                // 恢复按钮状态（发生错误）
+                enableAllControls();
             }
         }
         
@@ -944,7 +1008,6 @@
                 </div>
             `;
             resultDiv.style.display = 'block';
-            document.getElementById('compress-btn').disabled = false;
         }
         
         // 下载结果
@@ -963,8 +1026,7 @@
             document.getElementById('result').style.display = 'none';
             document.getElementById('progress').style.display = 'none';
             document.getElementById('compress-btn').disabled = true;
-            document.getElementById('output-filename').value = 'compressed_video.mp4';
-            document.getElementById('output-filename').value = 'compressed_video.mp4';
+            document.getElementById('output-filename').value = 'video_compressed.mp4';
         });
         
         // 格式化文件大小
