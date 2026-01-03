@@ -200,14 +200,14 @@
         <a href="/ui" class="back-btn">← 返回主页</a>
         
         <h1>💻 系统信息</h1>
-        <p class="subtitle">MiniTools 统一工具平台</p>
+        <p class="subtitle">MiniTools 统一工具平台 - 客户端信息</p>
         
         <div class="info-type-group">
             <button class="type-btn active" data-type="all">全部信息</button>
-            <button class="type-btn" data-type="os">操作系统</button>
-            <button class="type-btn" data-type="cpu">处理器</button>
-            <button class="type-btn" data-type="python">Python环境</button>
-            <button class="type-btn" data-type="time">当前时间</button>
+            <button class="type-btn" data-type="browser">浏览器</button>
+            <button class="type-btn" data-type="hardware">硬件</button>
+            <button class="type-btn" data-type="screen">屏幕</button>
+            <button class="type-btn" data-type="network">网络</button>
         </div>
         
         <button class="get-info-btn" onclick="getSystemInfo()">获取系统信息</button>
@@ -217,7 +217,6 @@
     
     <script>
         let selectedType = 'all';
-        const API_BASE_URL = `${window.location.protocol}//${window.location.host}`;
         
         // 信息类型选择
         document.querySelectorAll('.type-btn').forEach(btn => {
@@ -231,33 +230,124 @@
             });
         });
         
-        // 获取系统信息
+        // 获取客户端系统信息
         async function getSystemInfo() {
             const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '<div class="loading">正在获取系统信息...</div>';
+            resultDiv.innerHTML = '<div class="loading">正在获取客户端信息...</div>';
             resultDiv.classList.add('show');
             
             try {
-                const response = await fetch(`${API_BASE_URL}/plugins/SystemInfo/execute`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        info_type: selectedType
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    displayInfo(data.data);
-                } else {
-                    resultDiv.innerHTML = `<div class="error-message">${data.message}</div>`;
-                }
+                const data = await collectClientInfo();
+                displayInfo(data);
             } catch (error) {
-                resultDiv.innerHTML = `<div class="error-message">连接服务器失败: ${error.message}</div>`;
+                resultDiv.innerHTML = `<div class="error-message">获取客户端信息失败: ${error.message}</div>`;
             }
+        }
+        
+        // 收集客户端信息
+        async function collectClientInfo() {
+            const info = {};
+            
+            // 浏览器信息
+            if (selectedType === 'all' || selectedType === 'browser') {
+                info.browser = {
+                    userAgent: navigator.userAgent,
+                    name: getBrowserName(),
+                    version: getBrowserVersion(),
+                    language: navigator.language,
+                    languages: navigator.languages.join(', '),
+                    platform: navigator.platform,
+                    cookieEnabled: navigator.cookieEnabled ? '是' : '否',
+                    onLine: navigator.onLine ? '在线' : '离线',
+                    doNotTrack: navigator.doNotTrack || '未设置'
+                };
+            }
+            
+            // 硬件信息
+            if (selectedType === 'all' || selectedType === 'hardware') {
+                info.hardware = {
+                    cpuCores: navigator.hardwareConcurrency || '未知',
+                    deviceMemory: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : '不可用',
+                    maxTouchPoints: navigator.maxTouchPoints,
+                    touchSupport: navigator.maxTouchPoints > 0 ? '支持' : '不支持'
+                };
+            }
+            
+            // 屏幕信息
+            if (selectedType === 'all' || selectedType === 'screen') {
+                info.screen = {
+                    resolution: `${screen.width} x ${screen.height}`,
+                    availableResolution: `${screen.availWidth} x ${screen.availHeight}`,
+                    colorDepth: `${screen.colorDepth} 位`,
+                    pixelDepth: `${screen.pixelDepth} 位`,
+                    orientation: screen.orientation ? screen.orientation.type : '未知',
+                    devicePixelRatio: window.devicePixelRatio,
+                    viewport: `${window.innerWidth} x ${window.innerHeight}`
+                };
+            }
+            
+            // 网络信息
+            if (selectedType === 'all' || selectedType === 'network') {
+                info.network = {
+                    onLine: navigator.onLine ? '在线' : '离线'
+                };
+                
+                // Network Information API (如果可用)
+                if (navigator.connection || navigator.mozConnection || navigator.webkitConnection) {
+                    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                    info.network.effectiveType = conn.effectiveType || '未知';
+                    info.network.downlink = conn.downlink ? `${conn.downlink} Mbps` : '未知';
+                    info.network.rtt = conn.rtt ? `${conn.rtt} ms` : '未知';
+                    info.network.saveData = conn.saveData ? '开启' : '关闭';
+                }
+                
+                // 获取时区信息
+                info.network.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            }
+            
+            // 时间信息（所有类型都显示）
+            if (selectedType === 'all' || selectedType === 'network') {
+                const now = new Date();
+                info.time = {
+                    localTime: now.toLocaleString('zh-CN'),
+                    isoTime: now.toISOString(),
+                    timestamp: now.getTime(),
+                    timezoneOffset: `UTC${now.getTimezoneOffset() > 0 ? '-' : '+'}${Math.abs(now.getTimezoneOffset() / 60)}`
+                };
+            }
+            
+            return info;
+        }
+        
+        // 获取浏览器名称
+        function getBrowserName() {
+            const ua = navigator.userAgent;
+            if (ua.includes('Edg/')) return 'Microsoft Edge';
+            if (ua.includes('Chrome/') && !ua.includes('Edg/')) return 'Google Chrome';
+            if (ua.includes('Firefox/')) return 'Mozilla Firefox';
+            if (ua.includes('Safari/') && !ua.includes('Chrome/')) return 'Safari';
+            if (ua.includes('Opera/') || ua.includes('OPR/')) return 'Opera';
+            return '未知浏览器';
+        }
+        
+        // 获取浏览器版本
+        function getBrowserVersion() {
+            const ua = navigator.userAgent;
+            let match;
+            
+            if (ua.includes('Edg/')) {
+                match = ua.match(/Edg\/(\d+\.\d+)/);
+            } else if (ua.includes('Chrome/')) {
+                match = ua.match(/Chrome\/(\d+\.\d+)/);
+            } else if (ua.includes('Firefox/')) {
+                match = ua.match(/Firefox\/(\d+\.\d+)/);
+            } else if (ua.includes('Safari/')) {
+                match = ua.match(/Version\/(\d+\.\d+)/);
+            } else if (ua.includes('OPR/')) {
+                match = ua.match(/OPR\/(\d+\.\d+)/);
+            }
+            
+            return match ? match[1] : '未知';
         }
         
         // 显示信息
@@ -265,84 +355,80 @@
             const resultDiv = document.getElementById('result');
             let html = '';
             
-            if (data.os) {
+            if (data.browser) {
                 html += `
                     <div class="info-section">
-                        <h3>🖥️ 操作系统信息</h3>
-                        ${createInfoItem('系统', data.os.system)}
-                        ${createInfoItem('版本', data.os.release)}
-                        ${createInfoItem('详细版本', data.os.version)}
-                        ${createInfoItem('架构', data.os.architecture)}
-                `;
-                
-                // 内存信息
-                if (data.os.memory && !data.os.memory.error) {
-                    html += `
-                        ${createInfoItem('内存总量', data.os.memory.total)}
-                        ${createInfoItem('可用内存', data.os.memory.available)}
-                        ${createInfoItem('已用内存', data.os.memory.used + ' (' + data.os.memory.percent + ')')}
-                    `;
-                }
-                
-                // 显卡信息
-                if (data.os.gpu) {
-                    html += `${createInfoItem('显卡', data.os.gpu.model)}`;
-                    if (data.os.gpu.memory) {
-                        html += `${createInfoItem('显存', data.os.gpu.memory)}`;
-                    }
-                }
-                
-                html += `</div>`;
-            }
-            
-            if (data.cpu) {
-                html += `
-                    <div class="info-section">
-                        <h3>⚡ 处理器信息</h3>
-                        ${createInfoItem('型号', data.cpu.model)}
-                        ${createInfoItem('物理核心数', data.cpu.physical_cores + ' 核')}
-                        ${createInfoItem('逻辑核心数', data.cpu.logical_cores + ' 核（含超线程）')}
-                `;
-                
-                // 频率信息（统一使用GHz）
-                if (data.cpu.frequency && typeof data.cpu.frequency === 'object') {
-                    html += `
-                        ${createInfoItem('当前频率', data.cpu.frequency.current)}
-                        ${data.cpu.frequency.max !== '未知' ? createInfoItem('最大频率', data.cpu.frequency.max) : ''}
-                    `;
-                }
-                
-                html += `</div>`;
-            }
-            
-            if (data.python) {
-                html += `
-                    <div class="info-section">
-                        <h3>🐍 Python环境</h3>
-                        ${createInfoItem('Python版本', data.python.version)}
-                        ${createInfoItem('实现', data.python.implementation)}
-                        ${createInfoItem('编译器', data.python.compiler)}
+                        <h3>🌐 浏览器信息</h3>
+                        ${createInfoItem('浏览器', data.browser.name)}
+                        ${createInfoItem('版本', data.browser.version)}
+                        ${createInfoItem('平台', data.browser.platform)}
+                        ${createInfoItem('语言', data.browser.language)}
+                        ${createInfoItem('支持语言', data.browser.languages)}
+                        ${createInfoItem('Cookie', data.browser.cookieEnabled)}
+                        ${createInfoItem('网络状态', data.browser.onLine)}
+                        ${createInfoItem('追踪保护', data.browser.doNotTrack)}
                     </div>
                 `;
+            }
+            
+            if (data.hardware) {
+                html += `
+                    <div class="info-section">
+                        <h3>⚙️ 硬件信息</h3>
+                        ${createInfoItem('CPU核心数', data.hardware.cpuCores + ' 核')}
+                        ${createInfoItem('设备内存', data.hardware.deviceMemory)}
+                        ${createInfoItem('触摸支持', data.hardware.touchSupport)}
+                        ${createInfoItem('最大触控点', data.hardware.maxTouchPoints)}
+                    </div>
+                `;
+            }
+            
+            if (data.screen) {
+                html += `
+                    <div class="info-section">
+                        <h3>🖥️ 屏幕信息</h3>
+                        ${createInfoItem('屏幕分辨率', data.screen.resolution)}
+                        ${createInfoItem('可用分辨率', data.screen.availableResolution)}
+                        ${createInfoItem('视口大小', data.screen.viewport)}
+                        ${createInfoItem('像素比率', data.screen.devicePixelRatio)}
+                        ${createInfoItem('颜色深度', data.screen.colorDepth)}
+                        ${createInfoItem('像素深度', data.screen.pixelDepth)}
+                        ${createInfoItem('屏幕方向', data.screen.orientation)}
+                    </div>
+                `;
+            }
+            
+            if (data.network) {
+                html += `
+                    <div class="info-section">
+                        <h3>🌍 网络信息</h3>
+                        ${createInfoItem('连接状态', data.network.onLine)}
+                `;
+                
+                if (data.network.effectiveType) {
+                    html += `
+                        ${createInfoItem('网络类型', data.network.effectiveType)}
+                        ${createInfoItem('下行速度', data.network.downlink)}
+                        ${createInfoItem('往返延迟', data.network.rtt)}
+                        ${createInfoItem('省流模式', data.network.saveData)}
+                    `;
+                }
+                
+                if (data.network.timezone) {
+                    html += `${createInfoItem('时区', data.network.timezone)}`;
+                }
+                
+                html += `</div>`;
             }
             
             if (data.time) {
                 html += `
                     <div class="info-section">
                         <h3>⏰ 时间信息</h3>
-                        ${createInfoItem('当前时间', data.time.datetime)}
+                        ${createInfoItem('本地时间', data.time.localTime)}
+                        ${createInfoItem('ISO时间', data.time.isoTime)}
                         ${createInfoItem('时间戳', data.time.timestamp)}
-                    </div>
-                `;
-            }
-            
-            if (data.environment) {
-                html += `
-                    <div class="info-section">
-                        <h3>🌍 环境信息</h3>
-                        ${createInfoItem('用户', data.environment.user)}
-                        ${createInfoItem('主目录', data.environment.home)}
-                        ${createInfoItem('当前目录', data.environment.cwd)}
+                        ${createInfoItem('时区偏移', data.time.timezoneOffset)}
                     </div>
                 `;
             }
