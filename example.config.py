@@ -25,6 +25,4 @@ DEEPSEEK_BASE_URL = 'https://api.deepseek.com/v1'  # DeepSeek API地址
 DEEPSEEK_API_TIMEOUT = 120  # DeepSeek API请求超时时间（秒）
 
 # LM Studio配置
-LMSTUDIO_BASE_URL = 'http://localhost:11435/v1'  # LM Studio本地服务地址
-LMSTUDIO_API_KEY = ''  # LM Studio API密钥，留空则不发送Authorization头（本地服务通常不需要）
-LMSTUDIO_API_TIMEOUT = 300  # LM Studio API请求超时时间（秒）
+LMSTUDIO_BASE_URL = 'http://localhost:1234/v1'  # LM Studio本地服务地址LMSTUDIO_API_KEY = ''  # LM Studio API密钥，留空则不发送Authorization头（本地服务通常不需要）LMSTUDIO_API_TIMEOUT = 300  # LM Studio API请求超时时间（秒）

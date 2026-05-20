@@ -97,6 +97,8 @@ class VideoCompressor(BasePlugin):
                 ["ffmpeg", "-version"],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=5
             )
             return result.returncode == 0
@@ -111,6 +113,8 @@ class VideoCompressor(BasePlugin):
                 ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=5
             )
             
@@ -154,6 +158,8 @@ class VideoCompressor(BasePlugin):
                 ["ffmpeg", "-encoders"],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=10
             )
             
@@ -213,6 +219,8 @@ class VideoCompressor(BasePlugin):
                  "-show_format", "-show_streams", input_file],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=30
             )
             
@@ -317,6 +325,8 @@ class VideoCompressor(BasePlugin):
                 cmd,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=3600  # 1小时超时
             )
             

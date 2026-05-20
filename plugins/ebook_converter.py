@@ -68,7 +68,7 @@ class EbookConverterPlugin(BasePlugin):
                 "name": "translate_provider",
                 "type": "string",
                 "required": False,
-                "description": "翻译服务提供商: ollama, deepseek"
+                "description": "翻译服务提供商: ollama, deepseek, lmstudio"
             },
             {
                 "name": "translate_model",
@@ -164,6 +164,22 @@ class EbookConverterPlugin(BasePlugin):
             }
         except:
             dependencies["ollama"] = {"installed": False, "available": False, "models": []}
+
+        # 检查LM Studio
+        try:
+            lmstudio_url = getattr(config, 'LMSTUDIO_BASE_URL', 'http://localhost:1234/v1')
+            response = requests.get(f"{lmstudio_url}/models", timeout=2)
+            if response.status_code == 200:
+                model_ids = [m["id"] for m in response.json().get("data", [])]
+                dependencies["lmstudio"] = {
+                    "installed": True,
+                    "available": True,
+                    "models": model_ids
+                }
+            else:
+                dependencies["lmstudio"] = {"installed": False, "available": False, "models": []}
+        except:
+            dependencies["lmstudio"] = {"installed": False, "available": False, "models": []}
         
         return {
             "success": True,
@@ -462,6 +478,8 @@ class EbookConverterPlugin(BasePlugin):
             return self._translate_with_ollama(text, model, target_language, file_name, bilingual)
         elif provider == "deepseek":
             return self._translate_with_deepseek(text, model, target_language, file_name, bilingual)
+        elif provider == "lmstudio":
+            return self._translate_with_lmstudio(text, model, target_language, file_name, bilingual)
         else:
             return (False, "不支持的翻译服务")
     
@@ -746,7 +764,137 @@ class EbookConverterPlugin(BasePlugin):
             error_msg = f"DeepSeek翻译异常: {type(e).__name__} - {str(e)}"
             print(error_msg)
             return (False, error_msg)
-    
+
+    def _translate_with_lmstudio(self, text: str, model: str, target_language: str, file_name: str = None, bilingual: bool = False) -> tuple:
+        """使用LM Studio翻译（OpenAI兼容API）
+        返回: (success, result_or_error)
+        如果bilingual=True，返回(success, list_of_tuples)
+        """
+        try:
+            lmstudio_url = getattr(config, 'LMSTUDIO_BASE_URL', 'http://localhost:1234/v1')
+            lmstudio_timeout = getattr(config, 'LMSTUDIO_API_TIMEOUT', 300)
+            lmstudio_api_key = getattr(config, 'LMSTUDIO_API_KEY', '') or os.environ.get('LMSTUDIO_API_KEY', '')
+
+            # 构造请求头，仅在设置了 API Key 时附加 Authorization
+            headers = {"Content-Type": "application/json"}
+            if lmstudio_api_key:
+                headers["Authorization"] = f"Bearer {lmstudio_api_key}"
+
+            # 首先按段落分割原文
+            paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+
+            # 将每个段落进一步分割为更小的segments（如果段落太长）
+            max_segment_length = getattr(config, 'OLLAMA_MAX_SEGMENT_LENGTH', 2000)
+            all_segments = []  # [(para_index, segment_text)]
+            for para_idx, para in enumerate(paragraphs):
+                if len(para) <= max_segment_length:
+                    all_segments.append((para_idx, para))
+                else:
+                    sentences = para.split('. ')
+                    current_segment = ""
+                    for sentence in sentences:
+                        if len(current_segment) + len(sentence) + 2 <= max_segment_length:
+                            current_segment += sentence + ". "
+                        else:
+                            if current_segment:
+                                all_segments.append((para_idx, current_segment.strip()))
+                            current_segment = sentence + ". "
+                    if current_segment:
+                        all_segments.append((para_idx, current_segment.strip()))
+
+            # 更新进度：设置总段落数
+            if file_name and file_name in self.translation_progress:
+                self.translation_progress[file_name]["total"] = len(all_segments)
+                self.translation_progress[file_name]["status"] = "translating"
+
+            lang_map = {
+                "zh-CN": "简体中文",
+                "en": "English",
+                "ja": "日本語",
+                "ko": "한국어"
+            }
+            target_lang_name = lang_map.get(target_language, "简体中文")
+
+            # 用于存储每个段落的翻译结果
+            paragraph_translations = {}  # {para_index: [translated_segments]}
+
+            for i, (para_idx, segment) in enumerate(all_segments, 1):
+                try:
+                    response = requests.post(
+                        f"{lmstudio_url}/chat/completions",
+                        headers=headers,
+                        json={
+                            "model": model or "local-model",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": f"请将以下文本翻译成{target_lang_name}，保持原文的格式和段落结构，只返回翻译结果：\n\n{segment}"
+                                }
+                            ]
+                        },
+                        timeout=lmstudio_timeout
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        translated_text = result["choices"][0]["message"]["content"]
+                        if translated_text:
+                            if para_idx not in paragraph_translations:
+                                paragraph_translations[para_idx] = []
+                            paragraph_translations[para_idx].append(translated_text)
+
+                            print(f"  ✓ 段落 {i}/{len(all_segments)} 翻译成功")
+
+                            if file_name and file_name in self.translation_progress:
+                                self.translation_progress[file_name]["current"] = i
+                        else:
+                            return (False, f"LM Studio返回空结果 (段落 {i}/{len(all_segments)})")
+                    else:
+                        error_detail = response.text[:200]
+                        return (False, f"LM Studio API错误: HTTP {response.status_code} - {error_detail}")
+                except requests.exceptions.Timeout:
+                    return (False, f"LM Studio请求超时 (段落 {i}/{len(all_segments)})，请检查服务是否正常或增加超时时间")
+                except requests.exceptions.ConnectionError:
+                    return (False, f"无法连接到LM Studio服务 ({lmstudio_url})，请确认LM Studio已启动并开启本地服务器")
+
+            # 合并翻译结果
+            if bilingual:
+                bilingual_pairs = []
+                for para_idx, para in enumerate(paragraphs):
+                    translated_parts = paragraph_translations.get(para_idx, [])
+                    translated_para = " ".join(translated_parts) if translated_parts else para
+                    bilingual_pairs.append((para, translated_para))
+
+                if file_name and file_name in self.translation_progress:
+                    self.translation_progress[file_name]["status"] = "completed"
+
+                return (True, bilingual_pairs)
+            else:
+                translated_paragraphs = []
+                for para_idx in sorted(paragraph_translations.keys()):
+                    translated_parts = paragraph_translations[para_idx]
+                    translated_paragraphs.append(" ".join(translated_parts))
+
+                if not translated_paragraphs:
+                    return (False, "翻译结果为空")
+
+                if file_name and file_name in self.translation_progress:
+                    self.translation_progress[file_name]["status"] = "completed"
+
+                return (True, "\n\n".join(translated_paragraphs))
+        except KeyError as e:
+            if file_name and file_name in self.translation_progress:
+                self.translation_progress[file_name]["status"] = "failed"
+            error_msg = f"LM Studio API响应格式错误: 缺少字段 {str(e)}"
+            print(error_msg)
+            return (False, error_msg)
+        except Exception as e:
+            if file_name and file_name in self.translation_progress:
+                self.translation_progress[file_name]["status"] = "failed"
+            error_msg = f"LM Studio翻译异常: {type(e).__name__} - {str(e)}"
+            print(error_msg)
+            return (False, error_msg)
+
     def _split_text(self, text: str, max_length: int) -> List[str]:
         """分割文本为多个段落"""
         # 按段落分割

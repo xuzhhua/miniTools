@@ -3,235 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文本处理 - MiniTools</title>
+    <title>文本处理 — MiniTools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0f0f10; --surface: #18181b; --surface-2: #1f1f23;
+            --border: #27272a; --border-2: #3f3f46;
+            --text: #fafafa; --muted: #a1a1aa; --dim: #71717a;
+            --accent: #f59e0b; --accent-bg: rgba(245,158,11,0.1); --accent-bdr: rgba(245,158,11,0.3);
+            --success-bg: rgba(34,197,94,0.08); --success-bdr: rgba(34,197,94,0.2); --success-text: #86efac;
+            --error-bg: rgba(239,68,68,0.08); --error-bdr: rgba(239,68,68,0.2); --error-text: #fca5a5;
+            --radius: 8px;
         }
-        
+
+        html { scroll-behavior: smooth; }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: 'Outfit', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+            padding: 28px 20px;
+            line-height: 1.6;
         }
-        
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+
+        body::after {
+            content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999; opacity: 0.035;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         }
-        
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        
+
+        .container { max-width: 860px; margin: 0 auto; }
+
         .back-btn {
-            display: inline-block;
-            margin-bottom: 20px;
-            padding: 8px 16px;
-            background: #e0e0e0;
-            color: #333;
-            text-decoration: none;
-            border-radius: 6px;
-            transition: all 0.3s;
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-bottom: 28px; font-size: 13px; color: var(--dim);
+            text-decoration: none; transition: color 0.2s;
         }
-        
-        .back-btn:hover {
-            background: #d0d0d0;
-        }
-        
-        .input-group {
-            margin-bottom: 20px;
-        }
-        
+        .back-btn:hover { color: var(--text); }
+        .back-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+        .subtitle { font-size: 13px; color: var(--dim); margin-bottom: 32px; }
+
+        .input-group { margin-bottom: 20px; }
+
         label {
-            display: block;
-            color: #555;
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 8px;
+            display: block; font-size: 12px; font-weight: 500;
+            color: var(--muted); letter-spacing: 0.02em; margin-bottom: 8px;
         }
-        
+
         textarea {
-            width: 100%;
-            min-height: 150px;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            font-family: inherit;
-            resize: vertical;
-            transition: all 0.3s;
+            width: 100%; min-height: 150px; padding: 13px 14px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); font-family: 'JetBrains Mono', monospace;
+            font-size: 14px; color: var(--text); resize: vertical; outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-        
-        textarea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
+        textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+
         .operations {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px; margin-bottom: 20px;
         }
-        
+
         .op-btn {
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            background: white;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 14px;
-            text-align: center;
-            font-weight: 600;
+            padding: 12px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); cursor: pointer; transition: all 0.2s;
+            font-family: inherit; font-size: 14px; font-weight: 500; text-align: center;
+            color: var(--muted);
         }
-        
-        .op-btn:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
-        }
-        
-        .op-btn.active {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        
+        .op-btn:hover { border-color: var(--border-2); background: var(--surface-2); color: var(--text); }
+        .op-btn:active { transform: scale(0.98); }
+        .op-btn.active { background: var(--accent-bg); border-color: var(--accent-bdr); color: var(--accent); font-weight: 600; }
+
         .process-btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 20px;
+            width: 100%; padding: 13px; background: var(--accent); color: #0f0f10;
+            border: none; border-radius: var(--radius); font-family: inherit;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: background 0.2s, transform 0.15s; margin-bottom: 20px;
         }
-        
-        .process-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-        
-        .result {
-            display: none;
-        }
-        
-        .result.show {
-            display: block;
-        }
-        
+        .process-btn:hover { background: #fbbf24; transform: translateY(-1px); }
+        .process-btn:active { transform: translateY(0) scale(0.99); }
+        .process-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        .result { display: none; }
+        .result.show { display: block; }
+
         .result-box {
-            background: #f8f9fa;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
         }
-        
+
         .result-content {
-            font-family: 'Courier New', monospace;
-            font-size: 16px;
-            line-height: 1.6;
-            color: #333;
-            white-space: pre-wrap;
-            word-break: break-all;
+            font-family: 'JetBrains Mono', monospace; font-size: 14px;
+            line-height: 1.7; color: var(--text); white-space: pre-wrap; word-break: break-all;
         }
-        
+
         .stats-box {
-            background: #e7f3ff;
-            border-left: 4px solid #667eea;
-            padding: 15px;
-            border-radius: 6px;
-            margin-top: 15px;
+            background: var(--surface-2); border-left: 3px solid var(--accent);
+            padding: 13px 16px; border-radius: 0 var(--radius) var(--radius) 0; margin-top: 14px;
         }
-        
+
         .stats-item {
-            display: inline-block;
-            margin-right: 20px;
-            color: #555;
-            font-size: 14px;
+            display: inline-block; margin-right: 20px;
+            color: var(--muted); font-size: 13px;
         }
-        
-        .stats-item strong {
-            color: #333;
-        }
-        
-        .action-btns {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        
+        .stats-item strong { color: var(--text); font-family: 'JetBrains Mono', monospace; }
+
+        .action-btns { display: flex; gap: 8px; margin-top: 14px; }
+
         .copy-btn, .clear-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s;
+            padding: 9px 18px; border: none; border-radius: var(--radius);
+            cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500;
+            transition: all 0.2s;
         }
-        
-        .copy-btn {
-            background: #667eea;
-            color: white;
-        }
-        
-        .copy-btn:hover {
-            background: #5568d3;
-        }
-        
-        .copy-btn.copied {
-            background: #28a745;
-        }
-        
-        .clear-btn {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .clear-btn:hover {
-            background: #c82333;
-        }
-        
+        .copy-btn { background: var(--accent); color: #0f0f10; }
+        .copy-btn:hover { background: #fbbf24; }
+        .copy-btn.copied { background: rgba(34,197,94,0.15); color: var(--success-text); border: 1px solid var(--success-bdr); }
+
+        .clear-btn { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+        .clear-btn:hover { border-color: var(--error-bdr); color: var(--error-text); background: var(--error-bg); }
+
         .error-message {
-            background: #f8d7da;
-            border: 2px solid #f5c6cb;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 10px;
+            background: var(--error-bg);
+            border: 1px solid var(--error-bdr);
+            color: var(--error-text);
+            padding: 14px 16px;
+            border-radius: var(--radius);
         }
+
     </style>
 </head>
 <body>
     <div class="container">
         <a href="/ui" class="back-btn">← 返回主页</a>
         
-        <h1>📝 文本处理工具</h1>
-        <p class="subtitle">MiniTools 统一工具平台</p>
+        <h1>文本处理</h1>
+        <p class="subtitle">大小写转换 · 文本反转 · 字数统计</p>
         
         <div class="input-group">
             <label for="textInput">输入文本</label>
@@ -310,7 +223,7 @@
                 // 统计信息
                 html = `
                     <div class="result-box">
-                        <h3 style="color: #667eea; margin-bottom: 15px;">📊 统计结果</h3>
+                        <h3 style="color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 12px; letter-spacing: 0.02em; text-transform: uppercase;">统计结果</h3>
                         <div class="stats-box">
                             <div class="stats-item"><strong>总字符数:</strong> ${data.length}</div>
                             <div class="stats-item"><strong>总词数:</strong> ${data.words}</div>
@@ -322,7 +235,7 @@
                 // 文本处理结果
                 html = `
                     <div class="result-box">
-                        <h3 style="color: #667eea; margin-bottom: 15px;">✨ 处理结果</h3>
+                        <h3 style="color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 12px; letter-spacing: 0.02em; text-transform: uppercase;">处理结果</h3>
                         <div class="result-content">${escapeHtml(String(data))}</div>
                         <div class="action-btns">
                             <button class="copy-btn" onclick="copyResult()">📋 复制结果</button>
