@@ -330,7 +330,17 @@
         });
         
         // 页面加载时检测GPU
-        window.addEventListener('DOMContentLoaded', checkGPU);
+        window.addEventListener('DOMContentLoaded', () => {
+            cacheEncoderOptionLabels();
+            checkGPU();
+        });
+        
+        // 缓存编码器下拉框的原始文案，便于后续添加/移除“不可用”标记
+        function cacheEncoderOptionLabels() {
+            document.querySelectorAll('#encoder option').forEach(option => {
+                option.dataset.baseText = option.textContent;
+            });
+        }
         
         // 检测GPU支持
         async function checkGPU() {
@@ -362,51 +372,104 @@
                 return;
             }
             
-            const encoders = result.encoders;
+            const encoders = result.encoders || {};
+            const order = [
+                ['nvidia', 'NVIDIA NVENC'],
+                ['amd', 'AMD VCE'],
+                ['intel', 'Intel Quick Sync'],
+                ['cpu', 'CPU (libx264)']
+            ];
+            
             let html = '';
             
-            // 优先显示可用的主力显卡信息
-            let primaryGpu = null;
-            if (encoders.nvidia && encoders.nvidia.available) {
-                primaryGpu = encoders.nvidia;
-            } else if (encoders.amd && encoders.amd.available) {
-                primaryGpu = encoders.amd;
-            } else if (encoders.intel && encoders.intel.available) {
-                primaryGpu = encoders.intel;
-            }
-            
-            if (primaryGpu) {
-                // 显示主力显卡信息
-                html += `<div class="gpu-item available">`;
-                html += `<span class="name">${primaryGpu.name}</span>`;
-                
-                // 显示显卡型号和显存（如果有）
-                if (primaryGpu.gpu_model && primaryGpu.gpu_model !== '未知') {
-                    html += `<span class="status available">型号: ${primaryGpu.gpu_model}</span>`;
-                }
-                if (primaryGpu.gpu_memory && primaryGpu.gpu_memory !== '未知') {
-                    html += `<span class="status available">显存: ${primaryGpu.gpu_memory}</span>`;
-                }
-                
-                // 如果没有详细信息，只显示可用状态
-                if (!primaryGpu.gpu_model || primaryGpu.gpu_model === '未知') {
-                    html += `<span class="status available">硬件加速可用</span>`;
-                }
-                
-                html += `</div>`;
-            } else if (encoders.cpu && encoders.cpu.available) {
-                // 没有GPU，显示CPU编码
+            // 顶部显示“自动选择”实际会使用的编码器
+            if (result.recommended) {
+                const recName = result.recommended_name ||
+                    (Object.values(encoders).find(e => e && e.encoder === result.recommended) || {}).name ||
+                    result.recommended;
                 html += `
-                    <div class="gpu-item unavailable">
-                        <span class="name">无可用GPU</span>
-                        <span class="status unavailable">将使用CPU编码</span>
+                    <div class="gpu-item available">
+                        <span class="name">推荐编码器：${recName}</span>
+                        <span class="status available">“自动选择”将使用此编码器</span>
                     </div>
                 `;
-            } else {
+            }
+            
+            // 逐一列出各编码器的可用状态
+            order.forEach(([key, fallbackName]) => {
+                const entry = encoders[key];
+                if (!entry) return;
+                
+                const available = !!entry.available;
+                let detail = `<span class="status ${available ? 'available' : 'unavailable'}">${available ? '可用' : '不可用'}</span>`;
+                
+                if (available) {
+                    if (entry.gpu_model && entry.gpu_model !== '未知') {
+                        detail += `<span class="status available">型号: ${entry.gpu_model}</span>`;
+                    }
+                    if (entry.gpu_memory && entry.gpu_memory !== '未知') {
+                        detail += `<span class="status available">显存: ${entry.gpu_memory}</span>`;
+                    }
+                } else if (entry.reason) {
+                    detail += `<span class="status unavailable">${entry.reason}</span>`;
+                }
+                
+                html += `
+                    <div class="gpu-item ${available ? 'available' : ''}">
+                        <span class="name">${entry.name || fallbackName}</span>
+                        ${detail}
+                    </div>
+                `;
+            });
+            
+            if (!html) {
                 html = '<div style="color: #dc3545;">未检测到可用的编码器</div>';
             }
             
             gpuList.innerHTML = html;
+            
+            // 根据检测结果禁用不可用的编码器选项
+            updateEncoderOptions(encoders, result.recommended);
+        }
+        
+        // 根据探测结果禁用不可用的编码器选项
+        function updateEncoderOptions(encoders, recommended) {
+            const select = document.getElementById('encoder');
+            
+            // 编码器ID -> 是否可用
+            const availability = {};
+            Object.values(encoders || {}).forEach(entry => {
+                if (entry && entry.encoder) {
+                    availability[entry.encoder] = !!entry.available;
+                }
+            });
+            
+            Array.from(select.options).forEach(option => {
+                if (option.value === 'auto') return;
+                
+                const known = Object.prototype.hasOwnProperty.call(availability, option.value);
+                const available = !known || availability[option.value];
+                const baseText = option.dataset.baseText || option.textContent;
+                
+                option.disabled = !available;
+                option.textContent = available ? baseText : `${baseText}（不可用）`;
+            });
+            
+            // 更新“自动选择”项的文案
+            const autoOption = select.querySelector('option[value="auto"]');
+            if (autoOption && recommended) {
+                const recName = (Object.values(encoders || {}).find(e => e && e.encoder === recommended) || {}).name || recommended;
+                autoOption.textContent = `自动选择（推荐：${recName}）`;
+                autoOption.dataset.baseText = autoOption.textContent;
+            }
+            
+            // 当前选中的编码器若不可用，回退到自动选择
+            if (select.selectedOptions[0] && select.selectedOptions[0].disabled) {
+                select.value = 'auto';
+            }
+            
+            // 刷新预估信息中的 GPU 判断
+            updateEstimate();
         }
         
         // 文件上传区域事件
@@ -781,6 +844,10 @@
             resultDiv.className = 'result success';
             resultDiv.innerHTML = `
                 <h3>✅ 压缩完成</h3>
+                <div style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">
+                    使用编码器：${result.encoder_name || result.encoder_used || '未知'}
+                </div>
+                ${result.warning ? `<div style="font-size: 13px; color: #fbbf24; margin-bottom: 6px;">⚠️ ${result.warning}</div>` : ''}
                 <div class="result-details">
                     <div class="result-item">
                         <div class="label">原始大小</div>

@@ -7,10 +7,42 @@ from backend.base_plugin import BasePlugin
 class VideoCompressor(BasePlugin):
     """视频压缩工具插件，支持GPU加速"""
     
+    # 支持的编码器定义（preset_option 表示该编码器对应的预设参数名）
+    _ENCODERS = {
+        "h264_nvenc": {
+            "name": "NVIDIA NVENC",
+            "preset_option": "-preset",
+            "presets": {"fast": "fast", "medium": "medium", "slow": "slow"},
+            "pix_fmt": "yuv420p",
+        },
+        "h264_amf": {
+            "name": "AMD VCE",
+            "preset_option": "-quality",
+            "presets": {"fast": "speed", "medium": "balanced", "slow": "quality"},
+            "pix_fmt": "nv12",
+        },
+        "h264_qsv": {
+            "name": "Intel Quick Sync",
+            "preset_option": "-preset",
+            "presets": {"fast": "veryfast", "medium": "medium", "slow": "slow"},
+            "pix_fmt": "nv12",
+        },
+        "libx264": {
+            "name": "CPU (libx264)",
+            "preset_option": "-preset",
+            "presets": {"fast": "fast", "medium": "medium", "slow": "slow"},
+            "pix_fmt": None,
+        },
+    }
+    
+    # 自动选择的优先级：NVIDIA > AMD > Intel > CPU
+    _AUTO_PRIORITY = ("nvidia", "amd", "intel", "cpu")
+    
     def __init__(self):
         super().__init__()
-        self.description = "视频压缩工具，支持GPU加速（NVIDIA NVENC, AMD VCE等）"
-        self.version = "1.0.0"
+        self.description = "视频压缩工具，支持GPU硬件加速（NVIDIA NVENC / AMD VCE / Intel Quick Sync）"
+        self.version = "1.1.0"
+        self._probe_cache = {}
     
     def get_parameters(self):
         """返回插件所需的参数"""
@@ -144,8 +176,163 @@ class VideoCompressor(BasePlugin):
         except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
             return {"model": "未知", "memory": "未知"}
     
+    def _get_video_controllers(self):
+        """获取系统中的显卡控制器名称（跨平台，尽力而为）"""
+        controllers = []
+        try:
+            if os.name == 'nt':
+                # Windows：使用 PowerShell 枚举显示适配器
+                result = subprocess.run(
+                    ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                     "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    timeout=10
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    for line in result.stdout.splitlines():
+                        name = line.strip()
+                        if name:
+                            controllers.append({"name": name})
+            else:
+                # Linux：使用 lspci
+                result = subprocess.run(
+                    ["lspci"],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    for line in result.stdout.splitlines():
+                        lower = line.lower()
+                        if any(k in lower for k in (
+                            "vga compatible controller",
+                            "3d controller",
+                            "display controller",
+                        )):
+                            name = line.split(":", 2)[-1].strip()
+                            if name:
+                                controllers.append({"name": name})
+        except Exception:
+            pass
+        return controllers
+    
+    def _get_hardware_gpu_info(self):
+        """汇总各厂商显卡型号信息，形如 {'nvidia': {...}, 'intel': {...}}"""
+        info = {}
+        
+        # NVIDIA 优先使用 nvidia-smi（可同时获得显存信息）
+        nvidia = self._get_nvidia_gpu_info()
+        if nvidia.get("model") and nvidia.get("model") != "未知":
+            info["nvidia"] = {
+                "model": nvidia.get("model"),
+                "memory": nvidia.get("memory", "未知")
+            }
+        
+        # 其余厂商从系统显卡列表推断
+        for controller in self._get_video_controllers():
+            name = controller.get("name", "")
+            lower = name.lower()
+            if "nvidia" in lower and "nvidia" not in info:
+                info["nvidia"] = {"model": name, "memory": "未知"}
+            elif "intel" in lower and "intel" not in info:
+                info["intel"] = {"model": name}
+            elif ("amd" in lower or "radeon" in lower) and "amd" not in info:
+                info["amd"] = {"model": name}
+        
+        return info
+    
+    @staticmethod
+    def _extract_ffmpeg_error(stderr):
+        """从 ffmpeg stderr 中提取一行简洁的错误摘要"""
+        if not stderr:
+            return ""
+        lines = [line.strip() for line in stderr.strip().splitlines() if line.strip()]
+        if not lines:
+            return ""
+        # 优先返回包含错误关键字的那一行（ffmpeg 的详细错误通常在开头）
+        keywords = (
+            "error", "failed", "cannot", "no capable", "not supported",
+            "unable", "invalid", "not found", "openencodesession", "no such",
+            "no device", "device not",
+        )
+        for line in lines:
+            lower = line.lower()
+            if any(k in lower for k in keywords):
+                return line[:200]
+        return lines[0][:200]
+    
+    def _probe_encoder(self, encoder):
+        """实际执行一次极短的编码，验证编码器在当前硬件上是否真的可用。
+        
+        仅检查 `ffmpeg -encoders` 是不够的：Windows/macOS 的 ffmpeg 通常默认
+        编译了 NVENC/AMF 等编码器，但没有对应硬件时依然会列出，只有在真正
+        编码时才会报错。
+        """
+        if encoder in self._probe_cache:
+            return self._probe_cache[encoder]
+        
+        cfg = self._ENCODERS.get(encoder, {})
+        # 纯 CPU 编码器无需探测
+        if encoder == "libx264":
+            result = {"available": True, "reason": ""}
+            self._probe_cache[encoder] = result
+            return result
+        
+        cmd = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error",
+            "-f", "lavfi", "-i", "testsrc=size=320x240:rate=25",
+            "-frames:v", "1",
+            "-c:v", encoder,
+        ]
+        if cfg.get("pix_fmt"):
+            cmd.extend(["-pix_fmt", cfg["pix_fmt"]])
+        cmd.extend(["-f", "null", "-"])
+        
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=30
+            )
+            if proc.returncode == 0:
+                result = {"available": True, "reason": ""}
+            else:
+                result = {
+                    "available": False,
+                    "reason": self._extract_ffmpeg_error(proc.stderr) or "硬件不可用"
+                }
+        except subprocess.TimeoutExpired:
+            result = {"available": False, "reason": "检测超时"}
+        except FileNotFoundError:
+            result = {"available": False, "reason": "未找到 ffmpeg"}
+        except Exception as e:
+            result = {"available": False, "reason": str(e)}
+        
+        self._probe_cache[encoder] = result
+        return result
+    
+    def _select_auto_encoder(self, encoders=None):
+        """按优先级选择第一个真正可用的编码器"""
+        if encoders is None:
+            check = self._check_gpu()
+            encoders = check.get("encoders", {}) if check.get("success") else {}
+        
+        for key in self._AUTO_PRIORITY:
+            entry = encoders.get(key)
+            if entry and entry.get("available"):
+                return entry.get("encoder")
+        return "libx264"
+    
     def _check_gpu(self):
-        """检测可用的GPU编码器并获取显卡信息"""
+        """检测可用的GPU编码器并获取显卡信息（通过真实编码探测硬件）"""
         if not self._check_ffmpeg():
             return {
                 "success": False,
@@ -153,9 +340,9 @@ class VideoCompressor(BasePlugin):
             }
         
         try:
-            # 获取ffmpeg支持的编码器列表
+            # 获取ffmpeg支持的编码器列表（仅用于判断是否编译了该编码器）
             result = subprocess.run(
-                ["ffmpeg", "-encoders"],
+                ["ffmpeg", "-hide_banner", "-encoders"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -163,40 +350,66 @@ class VideoCompressor(BasePlugin):
                 timeout=10
             )
             
-            encoders_output = result.stdout
+            encoders_output = result.stdout or ""
             
-            # 获取NVIDIA显卡信息
-            nvidia_info = self._get_nvidia_gpu_info()
+            # 获取各厂商显卡信息
+            gpu_info = self._get_hardware_gpu_info()
             
-            gpu_encoders = {
-                "nvidia": {
-                    "available": "h264_nvenc" in encoders_output,
-                    "name": "NVIDIA NVENC",
-                    "encoder": "h264_nvenc",
-                    "gpu_model": nvidia_info.get("model", "未知"),
-                    "gpu_memory": nvidia_info.get("memory", "未知")
-                },
-                "amd": {
-                    "available": "h264_amf" in encoders_output,
-                    "name": "AMD VCE",
-                    "encoder": "h264_amf"
-                },
-                "intel": {
-                    "available": "h264_qsv" in encoders_output,
-                    "name": "Intel Quick Sync",
-                    "encoder": "h264_qsv"
-                },
-                "cpu": {
-                    "available": "libx264" in encoders_output,
-                    "name": "CPU (libx264)",
-                    "encoder": "libx264"
+            encoders = {}
+            hardware_encoders = (
+                ("nvidia", "h264_nvenc"),
+                ("amd", "h264_amf"),
+                ("intel", "h264_qsv"),
+            )
+            
+            for key, encoder_id in hardware_encoders:
+                cfg = self._ENCODERS[encoder_id]
+                entry = {
+                    "available": False,
+                    "name": cfg["name"],
+                    "encoder": encoder_id,
+                    "vendor": key,
+                    "reason": ""
                 }
+                
+                if encoder_id in encoders_output:
+                    # 编译了该编码器，进一步真实探测硬件是否可用
+                    probe = self._probe_encoder(encoder_id)
+                    entry["available"] = probe["available"]
+                    if not probe["available"]:
+                        entry["reason"] = probe.get("reason") or "硬件不可用"
+                else:
+                    entry["reason"] = "当前 ffmpeg 未编译该编码器"
+                
+                # 附加显卡型号信息
+                vendor_info = gpu_info.get(key, {})
+                entry["gpu_model"] = vendor_info.get("model", "未知")
+                if key == "nvidia":
+                    entry["gpu_memory"] = vendor_info.get("memory", "未知")
+                
+                # 未探测到对应硬件时，不展示型号信息
+                if not entry["available"]:
+                    entry["gpu_model"] = "未知"
+                
+                encoders[key] = entry
+            
+            cpu_available = "libx264" in encoders_output
+            encoders["cpu"] = {
+                "available": cpu_available,
+                "name": self._ENCODERS["libx264"]["name"],
+                "encoder": "libx264",
+                "vendor": "cpu",
+                "reason": "" if cpu_available else "当前 ffmpeg 未编译该编码器"
             }
+            
+            recommended = self._select_auto_encoder(encoders)
             
             return {
                 "success": True,
                 "ffmpeg_installed": True,
-                "encoders": gpu_encoders
+                "encoders": encoders,
+                "recommended": recommended,
+                "recommended_name": self._ENCODERS.get(recommended, {}).get("name", recommended)
             }
         
         except Exception as e:
@@ -258,6 +471,92 @@ class VideoCompressor(BasePlugin):
         except Exception as e:
             return {"success": False, "error": f"获取视频信息失败: {str(e)}"}
     
+    def _resolve_encoder(self, encoder):
+        """解析请求的编码器，返回 (编码器ID, 错误信息)"""
+        if encoder in (None, "", "auto"):
+            return self._select_auto_encoder(), None
+        
+        if encoder not in self._ENCODERS:
+            return None, f"不支持的编码器: {encoder}"
+        
+        # 明确指定硬件编码器时，先确认真实可用，避免运行到一半才失败
+        if encoder != "libx264":
+            probe = self._probe_encoder(encoder)
+            if not probe.get("available"):
+                name = self._ENCODERS[encoder]["name"]
+                reason = probe.get("reason") or "当前设备不支持"
+                return None, (
+                    f"{name} 在当前设备上不可用（{reason}）。"
+                    f"请改用“自动选择”或 CPU (libx264)"
+                )
+        
+        return encoder, None
+    
+    def _build_ffmpeg_cmd(self, encoder, params):
+        """根据编码器构建 ffmpeg 命令"""
+        cfg = self._ENCODERS.get(encoder, {})
+        
+        cmd = ["ffmpeg", "-hide_banner", "-i", params.get("input_file")]
+        
+        # 分辨率设置
+        resolution = params.get("resolution", "original")
+        if resolution and resolution != "original":
+            cmd.extend(["-s", resolution])
+        
+        # 视频编码器
+        cmd.extend(["-c:v", encoder])
+        
+        # 硬件编码器统一指定像素格式，提升兼容性
+        if encoder != "libx264" and cfg.get("pix_fmt"):
+            cmd.extend(["-pix_fmt", cfg["pix_fmt"]])
+        
+        # 码率设置
+        bitrate = params.get("bitrate", "2M")
+        if bitrate:
+            cmd.extend(["-b:v", bitrate])
+        
+        # 预设设置（不同编码器的参数名和取值不同，例如 AMD 使用 -quality）
+        preset = params.get("preset", "medium")
+        preset_map = cfg.get("presets", {})
+        mapped_preset = preset_map.get(preset) or preset_map.get("medium") or preset
+        cmd.extend([cfg.get("preset_option", "-preset"), mapped_preset])
+        
+        # CPU 编码额外使用 CRF 控制质量
+        if encoder == "libx264":
+            crf = params.get("crf", 23)
+            cmd.extend(["-crf", str(crf)])
+        
+        # 音频编码
+        cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+        
+        # 输出文件（-y 覆盖已存在的文件）
+        cmd.extend(["-y", params.get("output_file")])
+        
+        return cmd
+    
+    def _run_ffmpeg(self, cmd):
+        """执行 ffmpeg 命令"""
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=3600  # 1小时超时
+            )
+            return {
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr
+            }
+        except subprocess.TimeoutExpired:
+            return {"returncode": -1, "stdout": "", "stderr": "压缩超时（超过1小时）"}
+        except FileNotFoundError:
+            return {"returncode": -1, "stdout": "", "stderr": "未找到 ffmpeg，请先安装 ffmpeg"}
+        except Exception as e:
+            return {"returncode": -1, "stdout": "", "stderr": str(e)}
+    
     def _compress_video(self, params):
         """压缩视频"""
         input_file = params.get("input_file")
@@ -269,94 +568,48 @@ class VideoCompressor(BasePlugin):
         if not os.path.exists(input_file):
             return {"success": False, "error": f"输入文件不存在: {input_file}"}
         
-        # 确定使用的编码器
-        encoder = params.get("encoder", "auto")
-        if encoder == "auto":
-            gpu_check = self._check_gpu()
-            if gpu_check.get("success"):
-                encoders = gpu_check.get("encoders", {})
-                # 优先级：NVIDIA > AMD > Intel > CPU
-                if encoders.get("nvidia", {}).get("available"):
-                    encoder = "h264_nvenc"
-                elif encoders.get("amd", {}).get("available"):
-                    encoder = "h264_amf"
-                elif encoders.get("intel", {}).get("available"):
-                    encoder = "h264_qsv"
-                else:
-                    encoder = "libx264"
-            else:
-                encoder = "libx264"
+        # 解析编码器（"auto" 会挑选真正可用的编码器）
+        encoder, error = self._resolve_encoder(params.get("encoder", "auto"))
+        if error:
+            return {"success": False, "error": error}
         
-        # 构建ffmpeg命令
-        cmd = ["ffmpeg", "-i", input_file]
+        # 执行压缩
+        result = self._run_ffmpeg(self._build_ffmpeg_cmd(encoder, params))
         
-        # 添加编码器参数
-        cmd.extend(["-c:v", encoder])
-        
-        # 分辨率设置
-        resolution = params.get("resolution", "original")
-        if resolution != "original":
-            cmd.extend(["-s", resolution])
-        
-        # 码率设置
-        bitrate = params.get("bitrate", "2M")
-        cmd.extend(["-b:v", bitrate])
-        
-        # 预设设置
-        preset = params.get("preset", "medium")
-        if encoder in ["h264_nvenc", "h264_amf", "h264_qsv"]:
-            # GPU编码器预设
-            cmd.extend(["-preset", preset])
-        else:
-            # CPU编码器
-            cmd.extend(["-preset", preset])
-            crf = params.get("crf", 23)
-            cmd.extend(["-crf", str(crf)])
-        
-        # 音频编码
-        cmd.extend(["-c:a", "aac", "-b:a", "128k"])
-        
-        # 输出文件
-        cmd.extend(["-y", output_file])  # -y 覆盖已存在的文件
-        
-        try:
-            # 执行压缩
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=3600  # 1小时超时
+        # 硬件编码失败时自动回退到 CPU 编码，避免整个任务失败
+        warning = None
+        if result["returncode"] != 0 and encoder != "libx264":
+            warning = (
+                f"{self._ENCODERS[encoder]['name']} 编码失败"
+                f"（{self._extract_ffmpeg_error(result.get('stderr')) or '未知原因'}），"
+                f"已自动改用 CPU (libx264) 编码"
             )
-            
-            if result.returncode != 0:
-                return {
-                    "success": False,
-                    "error": f"压缩失败: {result.stderr}"
-                }
-            
-            # 获取输出文件信息
-            if os.path.exists(output_file):
-                input_size = os.path.getsize(input_file)
-                output_size = os.path.getsize(output_file)
-                compression_ratio = (1 - output_size / input_size) * 100 if input_size > 0 else 0
-                
-                return {
-                    "success": True,
-                    "message": "压缩完成",
-                    "result": {
-                        "output_file": output_file,
-                        "input_size": input_size,
-                        "output_size": output_size,
-                        "compression_ratio": round(compression_ratio, 2),
-                        "encoder_used": encoder
-                    }
-                }
-            else:
-                return {"success": False, "error": "输出文件未生成"}
+            encoder = "libx264"
+            result = self._run_ffmpeg(self._build_ffmpeg_cmd(encoder, params))
         
-        except subprocess.TimeoutExpired:
-            return {"success": False, "error": "压缩超时（超过1小时）"}
-        except Exception as e:
-            return {"success": False, "error": f"压缩过程出错: {str(e)}"}
+        if result["returncode"] != 0:
+            return {"success": False, "error": f"压缩失败: {result['stderr']}"}
+        
+        if not os.path.exists(output_file):
+            return {"success": False, "error": "输出文件未生成"}
+        
+        input_size = os.path.getsize(input_file)
+        output_size = os.path.getsize(output_file)
+        compression_ratio = (1 - output_size / input_size) * 100 if input_size > 0 else 0
+        
+        payload = {
+            "output_file": output_file,
+            "input_size": input_size,
+            "output_size": output_size,
+            "compression_ratio": round(compression_ratio, 2),
+            "encoder_used": encoder,
+            "encoder_name": self._ENCODERS.get(encoder, {}).get("name", encoder)
+        }
+        if warning:
+            payload["warning"] = warning
+        
+        return {
+            "success": True,
+            "message": "压缩完成",
+            "result": payload
+        }
